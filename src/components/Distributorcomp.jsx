@@ -50,12 +50,6 @@ const Distributorcomp = () => {
       desc: "Log and verify cash transactions.",
     },
     {
-      name: "Reports",
-      value: "reports",
-      icon: faChartLine,
-      desc: "View analytics and downloads.",
-    },
-    {
       name: "Necc-Rate",
       value:"neccrate",
       icon:  faRupee,
