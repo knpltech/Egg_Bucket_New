@@ -50,9 +50,9 @@ export default function NeccTableSection({rows,
 
 
   return (
-    <div className="pt-17"> 
+    <div className="pt-10"> 
       {/* 🟠 Title */}
-      <h1 className="text-3xl font-bold mb-6">NECC Rate</h1>
+      <h1 className="text-2xl font-bold mb-6">NECC Rate</h1>
 
       {/* 🟠 Filters */}
       <div className='flex justify-between items-center gap-3 mb-6'>
