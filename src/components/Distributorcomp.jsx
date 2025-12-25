@@ -7,8 +7,8 @@ import {
   faStore,
   faMoneyBill,
   faWallet,
-  faIndianRupeeSign,     // For NECC Rate
-  faExclamationTriangle, // For Damages
+  faIndianRupeeSign,
+  faArrowsSplitUpAndLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -50,8 +50,14 @@ const Distributorcomp = () => {
     {
       name: "Necc-Rate",
       value:"neccrate",
-      icon:  faRupee,
+      icon: faIndianRupeeSign,
       desc: "Average amount of eggs.",
+    },
+    {
+      name: "daily-damages",
+      value:"dailydamages",
+      icon: faArrowsSplitUpAndLeft,
+      desc: "total eggs damaged.",
     },
   ];
 
