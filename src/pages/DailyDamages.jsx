@@ -2,10 +2,268 @@ import { useState, useEffect, useRef } from "react";
 import { useDamage } from "../context/DamageContext";
 import * as XLSX from "xlsx";
 
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function formatDateDMY(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function formatDateDisplay(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString('en-GB').replace(/\//g, '-'); // dd-mm-yyyy
+}
+
+function CalendarIcon({ className = "" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <circle cx="8.5" cy="14.5" r="1" />
+      <circle cx="12" cy="14.5" r="1" />
+      <circle cx="15.5" cy="14.5" r="1" />
+    </svg>
+  );
+}
+
+function DamageEntryIcon({ className = "" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="16" cy="16" r="16" fill="#FFEFE0" />
+      <path
+        d="M10 12C10 10.8954 10.8954 10 12 10H20C21.1046 10 22 10.8954 22 12V20C22 21.1046 21.1046 22 20 22H12C10.8954 22 10 21.1046 10 20V12Z"
+        fill="#FF9D3A"
+      />
+      <path
+        d="M15 14L17 16M17 14L15 16"
+        stroke="#FFEFE0"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18.2 18.2L22.5 13.9C22.8 13.6 23.3 13.6 23.6 13.9L24.6 14.9C24.9 15.2 24.9 15.7 24.6 16L20.3 20.3L18.2 18.2Z"
+        fill="#FF7A1A"
+      />
+      <path
+        d="M18 18.5L17.3 21.2C17.2 21.6 17.6 22 18 21.9L20.7 21.2"
+        stroke="#FF7A1A"
+        strokeWidth="1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* BaseCalendar component remains unchanged (same as in your original code) */
+function BaseCalendar({ rows, selectedDate, onSelectDate, showDots }) {
+  const today = new Date();
+  const initialDate = selectedDate ? new Date(selectedDate) : today;
+  const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
+  const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const d = new Date(selectedDate);
+    if (!Number.isNaN(d.getTime())) {
+      setViewMonth(d.getMonth());
+      setViewYear(d.getFullYear());
+    }
+  }, [selectedDate]);
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+
+  const hasEntryForDate = (iso) =>
+    Array.isArray(rows) && rows.some((row) => row.date === iso);
+
+  const buildIso = (year, month, day) =>
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
+      2,
+      "0"
+    )}`;
+
+  const weeks = [];
+  let day = 1 - firstDay;
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let i = 0; i < 7; i++, day++) {
+      if (day < 1 || day > daysInMonth) {
+        week.push(null);
+      } else {
+        week.push(day);
+      }
+    }
+    weeks.push(week);
+  }
+
+  const goPrevMonth = () => {
+    setViewMonth((m) => {
+      if (m === 0) {
+        setViewYear((y) => y - 1);
+        return 11;
+      }
+      return m - 1;
+    });
+  };
+
+  const goNextMonth = () => {
+    setViewMonth((m) => {
+      if (m === 11) {
+        setViewYear((y) => y + 1);
+        return 0;
+      }
+      return m + 1;
+    });
+  };
+
+  const yearOptions = [];
+  for (let y = viewYear - 3; y <= viewYear + 3; y++) {
+    yearOptions.push(y);
+  }
+
+  const selectedIso = selectedDate || "";
+
+  return (
+    <div className="w-72 rounded-2xl border border-gray-100 bg-white shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <button
+          type="button"
+          onClick={goPrevMonth}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+        >
+          ‹
+        </button>
+        <div className="flex items-center gap-2">
+          <select
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 leading-none focus:outline-none focus:ring-1 focus:ring-orange-400"
+            value={viewMonth}
+            onChange={(e) => setViewMonth(Number(e.target.value))}
+          >
+            {MONTHS.map((m, idx) => (
+              <option key={m} value={idx}>
+                {m.slice(0, 3)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 leading-none focus:outline-none focus:ring-1 focus:ring-orange-400"
+            value={viewYear}
+            onChange={(e) => setViewYear(Number(e.target.value))}
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={goNextMonth}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+        >
+          ›
+        </button>
+      </div>
+      {/* Week days */}
+      <div className="mt-1 grid grid-cols-7 gap-y-1 px-4 text-center text-[11px] font-medium text-gray-400">
+        <span>Su</span>
+        <span>Mo</span>
+        <span>Tu</span>
+        <span>We</span>
+        <span>Th</span>
+        <span>Fr</span>
+        <span>Sa</span>
+      </div>
+      {/* Days */}
+      <div className="mt-1 grid grid-cols-7 gap-y-1 px-3 pb-3 text-center text-xs">
+        {weeks.map((week, wIdx) =>
+          week.map((d, idx) => {
+            if (!d) return <div key={`${wIdx}-${idx}`} />;
+            const iso = buildIso(viewYear, viewMonth, d);
+            const hasEntry = showDots && hasEntryForDate(iso);
+            const isSelected = selectedIso === iso;
+            const isToday =
+              today.getFullYear() === viewYear &&
+              today.getMonth() === viewMonth &&
+              today.getDate() === d;
+            const wrapperClass = showDots
+              ? "flex flex-col items-center gap-1"
+              : "flex h-8 items-center justify-center";
+            return (
+              <button
+                key={`${wIdx}-${idx}`}
+                type="button"
+                onClick={() => onSelectDate(iso)}
+                className={wrapperClass}
+              >
+                <div
+                  className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                    isSelected
+                      ? "bg-green-500 text-white"
+                      : isToday
+                      ? "border border-green-500 text-green-600"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {d}
+                </div>
+                {showDots && (
+                  <div
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      hasEntry ? "bg-green-500" : "bg-red-400"
+                    }`}
+                  />
+                )}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DailyDamages() {
   const { damages, addDamage, remapDamagesForOutlets } = useDamage();
+  const [isFromCalendarOpen, setIsFromCalendarOpen] = useState(false);
+  const [isToCalendarOpen, setIsToCalendarOpen] = useState(false);
 
-  // Outlets (load from Outlets management localStorage so all pages reflect changes)
   const DEFAULT_OUTLETS = ["AECS Layout", "Bandepalya", "Hosa Road", "Singasandra", "Kudlu Gate"];
   const STORAGE_KEY = "egg_outlets_v1";
 
@@ -29,19 +287,15 @@ export default function DailyDamages() {
 
   const [form, setForm] = useState(initialForm);
 
-  // When outlets change (from Outlets page), reset form and ensure displayed entries align
   useEffect(() => {
     setForm(() => {
       const f = {};
       outlets.forEach((o) => (f[o] = 0));
       return f;
     });
-
-    // Remap existing damages to match new outlets
     remapDamagesForOutlets(outlets);
   }, [outlets]);
 
-  // Listen for outlet changes from Outlets page (same-tab via custom event, cross-tab via storage event)
   useEffect(() => {
     const handler = (e) => {
       const areas = (e && e.detail) || null;
@@ -58,84 +312,23 @@ export default function DailyDamages() {
         }
       }
     };
-
     window.addEventListener('egg:outlets-updated', handler);
     const onStorage = (evt) => {
       if (evt.key === STORAGE_KEY) handler();
     };
     window.addEventListener('storage', onStorage);
-
     return () => {
       window.removeEventListener('egg:outlets-updated', handler);
       window.removeEventListener('storage', onStorage);
     };
   }, []);
 
-  // Entry date for the damage record (defaults to today)
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0]);
-
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Calendar popover state for date picker in the Date field
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const calendarRef = useRef(null);
+  const [isEntryCalendarOpen, setIsEntryCalendarOpen] = useState(false);
 
-  const prevMonth = () => {
-    setCalendarMonth(
-      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
-    );
-  };
-
-  const nextMonth = () => {
-    setCalendarMonth(
-      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
-    );
-  };
-
-  const getMonthGrid = (monthDate = calendarMonth) => {
-    const year = monthDate.getFullYear();
-    const month = monthDate.getMonth(); // 0-indexed
-    const monthStart = new Date(year, month, 1);
-    const startDay = monthStart.getDay(); // 0 = Sun
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
-    const grid = [];
-
-    for (let i = 0; i < totalCells; i++) {
-      const dayNum = i - startDay + 1;
-      if (dayNum < 1 || dayNum > daysInMonth) {
-        grid.push(null);
-      } else {
-        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
-          dayNum
-        ).padStart(2, "0")}`;
-        const hasEntry = damages.some((d) => d.date === dateStr);
-        grid.push({ day: dayNum, dateStr, hasEntry });
-      }
-    }
-
-    return grid;
-  };
-
-  // close popover on outside click
-  useEffect(() => {
-    const onClick = (e) => {
-      if (calendarRef.current && !calendarRef.current.contains(e.target)) {
-        setShowCalendar(false);
-      }
-    };
-    document.addEventListener('click', onClick);
-    return () => document.removeEventListener('click', onClick);
-  }, []);
-
-
-
-
-
-  // load existing data for selected date into form and set status
   const [hasEntry, setHasEntry] = useState(false);
   const [entryTotal, setEntryTotal] = useState(0);
 
@@ -154,30 +347,44 @@ export default function DailyDamages() {
       setHasEntry(false);
       setEntryTotal(0);
     }
+  }, [entryDate, damages, outlets]);
 
-    // set calendar month to currently selected date's month so popover shows the selected date
-    const [y, m] = entryDate.split('-');
-    setCalendarMonth(new Date(Number(y), Number(m) - 1, 1));
-  }, [entryDate, damages]);
+  const handleEntryDateSelect = (iso) => {
+    setEntryDate(iso);
+    const existingEntry = damages.find((d) => d.date === iso);
+    if (existingEntry) {
+      const loaded = {};
+      outlets.forEach((name) => {
+        loaded[name] = existingEntry[name] ?? 0;
+      });
+      setForm(loaded);
+      setHasEntry(true);
+      setEntryTotal(existingEntry.total ?? 0);
+    } else {
+      const reset = {};
+      outlets.forEach((o) => (reset[o] = 0));
+      setForm(reset);
+      setHasEntry(false);
+      setEntryTotal(0);
+    }
+    setIsEntryCalendarOpen(false);
+  };
 
   const save = () => {
     const total = outlets.reduce((s, name) => s + Number(form[name] || 0), 0);
-
     const success = addDamage({
       date: entryDate,
       ...form,
       total,
     });
-
     if (!success) {
       alert(`Entry for ${entryDate} already exists and cannot be modified.`);
       return;
     }
-
     alert(`Saved entry for ${entryDate}`);
     setHasEntry(true);
     setEntryTotal(total);
-  }; 
+  };
 
   const filteredData = damages.filter((d) => {
     if (!fromDate || !toDate) return true;
@@ -197,91 +404,16 @@ export default function DailyDamages() {
 
   return (
     <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex flex-col">
-
-
-      {/* Damage Entry */}
-      <div className="max-w-7xl mx-auto w-full">
-      <div className="bg-white p-6 rounded-xl shadow mb-8">
-        <h2 className="text-xl font-semibold mb-4">Enter Daily Damages</h2>
-
-
-
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Date</label>
-            <div className="flex items-center gap-3">
-              <div className="relative" ref={calendarRef}>
-                <input
-                  type="text"
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                  onFocus={() => setShowCalendar(true)}
-                  onClick={() => setShowCalendar(true)}
-                  className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-
-                {/* small status indicator */}
-                <div className="flex items-center gap-2 absolute right-0 top-1/2 -translate-y-1/2 mr-3">
-                  <div className={`w-3 h-3 rounded-full ${hasEntry ? 'bg-green-400' : 'bg-red-500'}`}></div>
-                  {hasEntry ? (
-                    <span className="text-sm text-green-700 font-medium">Entry ({entryTotal}) • Locked</span>
-                  ) : (
-                    <span className="text-sm text-red-600">No</span>
-                  )}
-                </div>
-
-                {showCalendar && (
-                  <div className="absolute z-50 mt-2 p-3 bg-white rounded-lg shadow-lg w-64">
-                    <div className="flex items-center justify-between mb-2">
-                      <button onClick={(e)=>{e.stopPropagation(); prevMonth();}} className="px-2 py-1 rounded bg-gray-100">◀</button>
-                      <div className="font-medium">{calendarMonth.toLocaleString("default", { month: "short" })} {calendarMonth.getFullYear()}</div>
-                      <button onClick={(e)=>{e.stopPropagation(); nextMonth();}} className="px-2 py-1 rounded bg-gray-100">▶</button>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1 text-sm mb-2">
-                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => (
-                        <div key={d} className="text-center font-medium text-xs text-gray-600">{d}</div>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1 text-sm">
-                      {getMonthGrid().map((cell, idx) => (
-                        cell ? (
-                          <div key={idx} onClick={(e)=>{e.stopPropagation(); setEntryDate(cell.dateStr); setShowCalendar(false); }} className={`p-2 rounded text-center cursor-pointer select-none ${entryDate === cell.dateStr ? 'ring-2 ring-orange-400' : ''}`}>
-                            <div className="text-sm">{cell.day}</div>
-                            <div className={`h-2 w-2 rounded-full mx-auto mt-2 ${cell.hasEntry ? 'bg-green-400' : 'bg-red-500'}`}></div>
-                          </div>
-                        ) : (
-                          <div key={idx} className="p-2"></div>
-                        )
-                      ))}
-                    </div>
-
-                  </div>
-                )}
-              </div>
-            </div>            </div>
-          {outlets.map((name) => (
-            <div key={name}>
-              <label className="block text-sm text-gray-600 mb-1">{name}</label>
-              <input
-                type="number"
-                value={form[name] ?? 0}
-                onChange={(e) => setForm({ ...form, [name]: Number(e.target.value) })}
-                disabled={hasEntry}
-                className={`w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400 ${hasEntry ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              />
-            </div>
-          ))}
+      {/* Header */}
+      <div className="max-w-7xl mx-auto w-full mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">
+            Daily Damages Report
+          </h1>
+          <p className="mt-1 text-sm md:text-base text-gray-500">
+            Track egg damages per outlet and date.
+          </p>
         </div>
-
-        <button
-          onClick={save}
-          disabled={hasEntry}
-          className={`bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-medium ${hasEntry ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {hasEntry ? 'Locked' : 'Save'}
-        </button>
       </div>
 
       {/* Data Table */}
@@ -296,14 +428,13 @@ export default function DailyDamages() {
               <th className="p-3 text-center font-semibold">Total</th>
             </tr>
           </thead>
-
           <tbody>
             {filteredData.map((d, i) => (
               <tr
                 key={i}
                 className="border-t text-sm hover:bg-gray-50 transition"
               >
-                <td className="p-3 text-left">{d.date}</td>
+                <td className="p-3 text-left">{formatDateDisplay(d.date)}</td>
                 {outlets.map((name) => (
                   <td key={name} className="p-3 text-center">{d[name] ?? 0}</td>
                 ))}
@@ -317,34 +448,59 @@ export default function DailyDamages() {
       </div>
 
       {/* Download Report */}
-      <div className="bg-white p-6 rounded-xl shadow">
+      <div className="bg-white p-6 rounded-xl shadow mb-8">
         <h2 className="text-xl font-semibold mb-4">Download Report</h2>
-
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-          <div>
+          <div className="relative">
             <label className="block text-sm text-gray-600 mb-1">
               From Date
             </label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
+            <button
+              type="button"
+              onClick={() => setIsFromCalendarOpen((o) => !o)}
+              className="flex min-w-[120px] items-center justify-between rounded-lg border p-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+            >
+              <span>
+                {fromDate ? formatDateDMY(fromDate) : "dd-mm-yyyy"}
+              </span>
+              <CalendarIcon className="h-4 w-4 text-gray-500 ml-2" />
+            </button>
+            {isFromCalendarOpen && (
+              <div className="absolute left-0 top-full z-30 mt-2">
+                <BaseCalendar
+                  rows={damages}
+                  selectedDate={fromDate}
+                  onSelectDate={setFromDate}
+                  showDots={false}
+                />
+              </div>
+            )}
           </div>
-
-          <div>
+          <div className="relative">
             <label className="block text-sm text-gray-600 mb-1">
               To Date
             </label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
+            <button
+              type="button"
+              onClick={() => setIsToCalendarOpen((o) => !o)}
+              className="flex min-w-[120px] items-center justify-between rounded-lg border p-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-400"
+            >
+              <span>
+                {toDate ? formatDateDMY(toDate) : "dd-mm-yyyy"}
+              </span>
+              <CalendarIcon className="h-4 w-4 text-gray-500 ml-2" />
+            </button>
+            {isToCalendarOpen && (
+              <div className="absolute left-0 top-full z-30 mt-2">
+                <BaseCalendar
+                  rows={damages}
+                  selectedDate={toDate}
+                  onSelectDate={setToDate}
+                  showDots={false}
+                />
+              </div>
+            )}
           </div>
-
           <button
             onClick={downloadExcel}
             className="h-[42px] bg-green-600 hover:bg-green-700 text-white px-6 rounded-lg font-medium"
@@ -353,6 +509,116 @@ export default function DailyDamages() {
           </button>
         </div>
       </div>
+
+      {/* Damage Entry – now matches Digital Payment Entry UI exactly */}
+      <div className="mt-8 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100">
+            <DamageEntryIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 md:text-lg">
+              Daily Damages Entry
+            </h2>
+            <p className="text-xs text-gray-500 md:text-sm">
+              Add new egg damage amounts for each outlet.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          {/* Select Date */}
+          <div className="grid gap-4 md:grid-cols-[160px,1fr] md:items-center">
+            <label className="text-xs font-medium text-gray-700 md:text-sm">
+              Select Date
+            </label>
+            <div className="relative w-full">
+              <button
+                type="button"
+                onClick={() => setIsEntryCalendarOpen((open) => !open)}
+                className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
+              >
+                <span>
+                  {entryDate ? formatDateDMY(entryDate) : "dd-mm-yyyy"}
+                </span>
+                <CalendarIcon className="h-4 w-4 text-gray-500" />
+              </button>
+
+              {/* Locked indicator */}
+              {hasEntry && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <div className="text-xs font-medium text-green-700">
+                    Entry (₹{entryTotal}) • Locked
+                  </div>
+                </div>
+              )}
+
+              {/* Calendar dropdown */}
+              {isEntryCalendarOpen && (
+                <div className="absolute right-0 bottom-full z-30 mb-2">
+                  <BaseCalendar
+                    rows={damages}
+                    selectedDate={entryDate}
+                    onSelectDate={handleEntryDateSelect}
+                    showDots={true}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Outlet inputs */}
+          <div className="grid gap-3 md:grid-cols-5">
+            {outlets.map((outlet) => (
+              <div key={outlet} className="space-y-1">
+                <p className="text-xs font-medium text-gray-600">
+                  {outlet}
+                </p>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form[outlet] ?? 0}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        [outlet]: Number(e.target.value),
+                      }))
+                    }
+                    disabled={hasEntry}
+                    className={`w-full rounded-xl border border-gray-200 bg-eggBg pl-7 pr-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm ${
+                      hasEntry ? "bg-gray-50 cursor-not-allowed" : ""
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Save button + note */}
+          <div className="flex flex-col items-center gap-2 pt-4">
+            <button
+              type="button"
+              onClick={save}
+              disabled={hasEntry}
+              className={`inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md ${
+                hasEntry
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-orange-500 hover:bg-orange-600"
+              }`}
+            >
+              {hasEntry ? "Locked" : "Save Entry"}
+            </button>
+            <p className="text-center text-[11px] text-gray-500 md:text-xs">
+              Values support decimals for exact amounts.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
