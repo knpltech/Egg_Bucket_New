@@ -9,9 +9,12 @@ import {
   faStore,
   faMoneyBill,
   faWallet,
-  faRupee,
+  faIndianRupeeSign,
   faArrowsSplitUpAndLeft,
 } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faIndianRupeeSign } from "@fortawesome/free-solid-svg-icons";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 const Distributorcomp = () => {
@@ -52,7 +55,7 @@ const Distributorcomp = () => {
     {
       name: "Necc-Rate",
       value:"neccrate",
-      icon:  faRupee,
+      icon:  faIndianRupeeSign,
       desc: "Average amount of eggs.",
     },
     {
