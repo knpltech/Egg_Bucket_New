@@ -8,12 +8,13 @@ import Sidebar from '../components/Sidebar'
 import { useState, useEffect } from 'react';
 
 const Dailysales = () => {
+  const STORAGE_KEY = "dailySales_v2";
 
   const [rows,setRows]=useState([]);
   const [isLoaded, setIsLoaded]= useState(false);
   
   useEffect(()=>{
-    const savedDate= localStorage.getItem("dailySales");
+    const savedDate= localStorage.getItem(STORAGE_KEY);
     if(savedDate){
       setRows(JSON.parse(savedDate));
     }
@@ -22,7 +23,7 @@ const Dailysales = () => {
 
   useEffect(()=>{
     if(isLoaded){
-      localStorage.setItem("dailySales", JSON.stringify(rows))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
     }
   },[rows,isLoaded]);
 
