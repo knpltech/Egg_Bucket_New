@@ -66,6 +66,7 @@ const SAMPLE_OUTLETS = [
 
 const Dailysales = () => {
   const STORAGE_KEY = "dailySales_v2";
+  const OUTLETS_KEY = "egg_outlets_v1";
 
   const [rows,setRows]=useState([]);
   const [isLoaded, setIsLoaded]= useState(false);
@@ -73,7 +74,7 @@ const Dailysales = () => {
   
   useEffect(()=>{
     const loadOutletsFromLocal = () => {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(OUTLETS_KEY);
       if (saved) {
         const savedOutlets = JSON.parse(saved);
         const required = DEFAULT_OUTLETS;
@@ -148,9 +149,9 @@ const Dailysales = () => {
     const data = sortedRows.map(row => {
       const obj = { Date: row.date };
       if (row.outlets && typeof row.outlets === 'object') {
-        outlets.forEach(o => obj[o] = row.outlets[o] ?? 0);
+        outletNames.forEach(o => obj[o] = row.outlets[o] ?? 0);
       } else {
-        outlets.forEach(o => obj[o] = row[o] ?? 0);
+        outletNames.forEach(o => obj[o] = row[o] ?? 0);
       }
       obj.Total = row.total ?? row.Total ?? 0;
       return obj;
@@ -161,13 +162,17 @@ const Dailysales = () => {
     XLSX.writeFile(wb, 'Daily_Sales_Report.xlsx');
   };
 
+  const outletNames = outlets
+  .map(o => (typeof o === "string" ? o : o?.area))
+  .filter(Boolean);
+
   return (
     <div className='flex'>
       <div className='bg-[#F8F6F2] min-h-screen p-6 w-340'>
 
       <Topbar/>
       <Dailyheader dailySalesData={rows}/>
-      <DailyTable rows={rows}/>
+      <DailyTable rows={rows} outlets={outlets}/>
       <div className="grid grid-cols-3 gap-6 mt-10">
 
         {/* Entry Form (biggest block) */}
