@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 import { useState, useEffect } from 'react';
 import Entryform from '../components/Entryform'
 import Rateanalytics from '../components/Rateanalytics'
@@ -30,7 +31,7 @@ const Neccrate = () => {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const res = await fetch("/api/neccrate/all");
+        const res = await fetch(`${API_URL}/neccrate/all`);
         const data = await res.json();
         setRows(Array.isArray(data) ? data : []);
       } catch {
@@ -44,13 +45,13 @@ const Neccrate = () => {
   // Add new entry
   const addRow = async (newRow) => {
     try {
-      await fetch("/api/neccrate/add", {
+      await fetch(`${API_URL}/neccrate/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRow),
       });
       // Refetch from backend after adding
-      const res = await fetch("/api/neccrate/all");
+      const res = await fetch(`${API_URL}/neccrate/all`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {

@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 import { useState, useEffect, useRef } from "react";
 import { useDamage } from "../context/DamageContext";
 import * as XLSX from "xlsx";
@@ -382,7 +383,7 @@ export default function DailyDamages() {
     }
     // Save to backend for persistence
     try {
-      await fetch("/api/daily-damage/add-daily-damage", {
+      await fetch(`${API_URL}/daily-damage/add-daily-damage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: entryDate, damages: { ...form }, total }),

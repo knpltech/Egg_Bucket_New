@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 
 import { useEffect, useState } from "react";
 import { useDamage } from "../context/DamageContext";
@@ -19,7 +20,7 @@ export default function AdminDashboard() {
     }
     // If no outlets in localStorage, fetch from backend
     if (!Array.isArray(outlets) || outlets.length === 0) {
-      fetch("/api/outlets/all")
+      fetch(`${API_URL}/outlets/all`)
         .then(res => res.json())
         .then(list => {
           const activeOutlets = Array.isArray(list)
@@ -35,7 +36,7 @@ export default function AdminDashboard() {
     // Eggs distributed today
     const fetchEggsToday = async () => {
       try {
-        const res = await fetch("/api/dailysales/all");
+        const res = await fetch(`${API_URL}/dailysales/all`);
         const sales = await res.json();
         const today = new Date().toISOString().slice(0, 10);
         const todayRow = Array.isArray(sales) ? sales.find(r => r.date === today) : null;
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
     // NECC Rate (latest)
     const fetchNeccRate = async () => {
       try {
-        const res = await fetch("/api/neccrate/all");
+        const res = await fetch(`${API_URL}/neccrate/all`);
         const rates = await res.json();
         let latest = null;
         if (Array.isArray(rates) && rates.length > 0) {

@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 // src/pages/CashPayment.jsx
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
@@ -303,7 +304,7 @@ export default function CashPayment() {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        const res = await fetch("/api/cash-payments/all");
+        const res = await fetch(`${API_URL}/cash-payments/all`);
         const data = await res.json();
         setRows(Array.isArray(data) ? data : []);
       } catch {
@@ -507,13 +508,13 @@ export default function CashPayment() {
 
     // Save to backend
     try {
-      await fetch("/api/cash-payments/add", {
+      await fetch(`${API_URL}/cash-payments/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: entryDate, outlets: outletAmounts }),
       });
       // Refetch from backend after adding
-      const res = await fetch("/api/cash-payments/all");
+      const res = await fetch(`${API_URL}/cash-payments/all`);
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {

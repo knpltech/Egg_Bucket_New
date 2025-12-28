@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 import React, { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
 
@@ -8,7 +9,7 @@ const DistributorList = () => {
   useEffect(() => {
     const fetchDistributors = async () => {
       try {
-        const res = await fetch("/api/admin/all-distributors");
+        const res = await fetch(`${API_URL}/admin/all-distributors`);
         const data = await res.json();
         setDistributors(Array.isArray(data) ? data : []);
       } catch {

@@ -1,3 +1,4 @@
+const API_URL = import.meta.env.VITE_API_URL;
 // src/pages/Outlets.jsx
 import { useMemo, useState, useEffect } from "react";
 
@@ -157,7 +158,7 @@ export default function Outlets() {
     async function syncToBackend() {
       for (const outlet of outlets) {
         try {
-          await fetch("/api/outlets/add", {
+          await fetch(`${API_URL}/outlets/add`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(outlet),
@@ -252,7 +253,7 @@ const handleOpenEditModal = (outlet) => {
 const handleDeleteOutlet = async (id) => {
   if (!confirm("Are you sure you want to delete this outlet?")) return;
   try {
-    await fetch(`/api/outlets/delete/${id}`, { method: "DELETE" });
+    await fetch(`${API_URL}/outlets/delete/${id}`, { method: "DELETE" });
     setOutlets((prev) => prev.filter((o) => o.id !== id));
   } catch (err) {
     alert("Failed to delete outlet from backend.");
@@ -336,7 +337,7 @@ const handleDeleteOutlet = async (id) => {
         status: newOutlet.status,
       };
       try {
-        await fetch("/api/outlets/add", {
+        await fetch(`${API_URL}/outlets/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedOutlet),
@@ -363,7 +364,7 @@ const handleDeleteOutlet = async (id) => {
         reviewStatus: "pending",
       };
       try {
-        await fetch("/api/outlets/add", {
+        await fetch(`${API_URL}/outlets/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(outletToAdd),
@@ -611,7 +612,7 @@ const handleDeleteOutlet = async (id) => {
                             type="button"
                             onClick={async () => {
                               try {
-                                await fetch("/api/outlets/add", {
+                                await fetch(`${API_URL}/outlets/add`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ ...outlet, status: "Active" }),
@@ -634,7 +635,7 @@ const handleDeleteOutlet = async (id) => {
                             type="button"
                             onClick={async () => {
                               try {
-                                await fetch("/api/outlets/add", {
+                                await fetch(`${API_URL}/outlets/add`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ ...outlet, status: "Inactive" }),
