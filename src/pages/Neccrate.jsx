@@ -25,25 +25,37 @@ const Neccrate = () => {
     .sort((a, b) => new Date(a.date) - new Date(b.date)); // Sort by date ascending (oldest to newest)
 
 
-  // Load data from localStorage
+
+  // Fetch NECC rates from backend
   useEffect(() => {
-    const savedData = localStorage.getItem("neccRates");
-    if (savedData) {
-      setRows(JSON.parse(savedData));
-    }
-    setIsLoaded(true);
+    const fetchRates = async () => {
+      try {
+        const res = await fetch("/api/neccrate/all");
+        const data = await res.json();
+        setRows(Array.isArray(data) ? data : []);
+      } catch {
+        setRows([]);
+      }
+      setIsLoaded(true);
+    };
+    fetchRates();
   }, []);
 
-  // Save data to localStorage whenever rows change
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("neccRates", JSON.stringify(rows));
-    }
-  }, [rows,isLoaded]);
-
   // Add new entry
-  const addRow = (newRow) => {
-    setRows([newRow, ...rows]); // latest entry on top
+  const addRow = async (newRow) => {
+    try {
+      await fetch("/api/neccrate/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRow),
+      });
+      // Refetch from backend after adding
+      const res = await fetch("/api/neccrate/all");
+      const data = await res.json();
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // Ignore backend error for now
+    }
   };
 
   return (

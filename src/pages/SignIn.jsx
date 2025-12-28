@@ -6,7 +6,7 @@ import egg from "../assets/egg.png";
 export default function SignIn() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Admin"); 
+  const [role, setRole] = useState("admin"); 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -22,7 +22,7 @@ export default function SignIn() {
       const res = await fetch("http://localhost:5000/api/auth/signin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, role }),
+        body: JSON.stringify({ username, password, role: role.toLowerCase() }),
       });
 
       const data = await res.json();
@@ -104,11 +104,11 @@ export default function SignIn() {
           {/* ROLE SELECTOR */}
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => setRole(e.target.value.toLowerCase())}
             className="w-full p-3 rounded-xl bg-eggInput outline-none shadow"
           >
-            <option value="Admin">Admin</option>
-            <option value="Viewer">Viewer</option>
+            <option value="admin">Admin</option>
+            <option value="viewer">Viewer</option>
           </select>
 
           <button

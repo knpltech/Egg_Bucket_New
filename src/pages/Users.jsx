@@ -9,11 +9,21 @@ const Users = () => {
     const [editUser, setEditUser] = useState(null);
 
     // Delete user handler
-    const handleDeleteUser = (id) => {
+    const handleDeleteUser = async (id, username, roles) => {
       if (!window.confirm('Are you sure you want to delete this user?')) return;
-      const updated = users.filter(u => u.id !== id);
-      setUsers(updated);
-      localStorage.setItem('users', JSON.stringify(updated));
+      // Determine collection: viewers if roles includes 'viewer', else users
+      const isViewer = (Array.isArray(roles) ? roles : [roles]).some(r => (r || '').toLowerCase() === 'viewer');
+      const collection = isViewer ? 'viewers' : 'users';
+      try {
+        await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, collection }),
+        });
+        setUsers(users.filter(u => u.id !== id));
+      } catch {
+        alert('Failed to delete user from database.');
+      }
     };
 
     // Edit user handler
@@ -67,25 +77,16 @@ const Users = () => {
   }, [overflowOpen]);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("users")) || [];
-
-    // Deduplicate by username (case-insensitive), keeping first occurrence
-    const unique = [];
-    const seen = new Set();
-    for (const u of saved) {
-      const key = (u.username || "").trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(u);
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch("/api/admin/all-viewers");
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : []);
+      } catch {
+        setUsers([]);
       }
-    }
-
-    if (unique.length !== saved.length) {
-      // Persist cleaned list back to storage
-      localStorage.setItem("users", JSON.stringify(unique));
-    }
-
-    setUsers(unique);
+    };
+    fetchUsers();
   }, []);
 
   // Debounce search input for smoother UX

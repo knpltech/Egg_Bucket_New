@@ -52,19 +52,19 @@ const Distributorcomp = () => {
     },
     {
       name: "NECC Rate",
-      value:"neccrate",
+      value: "neccrate",
       icon: faIndianRupeeSign,
       desc: "Average amount of eggs.",
     },
     {
       name: "Daily Damages",
-      value:"dailydamages",
+      value: "dailydamages",
       icon: faArrowsSplitUpAndLeft,
       desc: "total eggs damaged.",
     },
+    // Viewer role removed from selection
   ];
-
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Basic validation
     if (!form.fullName || !form.username) {
       alert("Please provide full name and username.");
@@ -76,48 +76,37 @@ const Distributorcomp = () => {
       return;
     }
 
-    const existing = JSON.parse(localStorage.getItem("users")) || [];
-
-    // Normalize username for uniqueness (case-insensitive)
-    const normalizedUsername = (form.username || "").trim().toLowerCase();
-    if (existing.some((u) => (u.username || "").trim().toLowerCase() === normalizedUsername)) {
-      alert("Username already exists!");
-      return;
+    // Always store as viewer in viewers collection, but include access roles
+    try {
+      const res = await fetch("/api/admin/add-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: form.fullName.trim(),
+          phone: form.phone?.trim() || "",
+          username: form.username.trim(),
+          password: form.password,
+          fromDistributorPage: true,
+          roles: Array.isArray(form.roles) && form.roles.length > 0 ? [...form.roles, "viewer"] : ["viewer"]
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("Distributor added successfully!");
+        setForm({
+          fullName: "",
+          phone: "",
+          username: "",
+          password: "",
+          confirmPassword: "",
+          roles: [],
+        });
+      } else {
+        alert(data.error || "Failed to add distributor.");
+      }
+    } catch (err) {
+      alert("Network error. Please try again.");
     }
-
-    // Prevent duplicate phone (if provided)
-    if (form.phone && existing.some((u) => u.phone === form.phone)) {
-      alert("Phone number already in use!");
-      return;
-    }
-
-    // Generate stable unique id
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : `user-${Date.now()}`;
-
-    const newUser = {
-      id,
-      fullName: form.fullName.trim(),
-      phone: form.phone?.trim() || "",
-      username: normalizedUsername,
-      roles: Array.isArray(form.roles) ? form.roles : [],
-      // NOTE: passwords are not persisted in this demo app for simplicity/security
-    };
-
-    const updated = [...existing, newUser];
-    localStorage.setItem("users", JSON.stringify(updated));
-
-    alert("Distributor added successfully!");
-
-    setForm({
-      fullName: "",
-      phone: "",
-      username: "",
-      password: "",
-      confirmPassword: "",
-      roles: [],
-    });
   };
 
   return (

@@ -1,5 +1,6 @@
 import { db } from "../config/firebase.js";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 const JWT_SECRET = "egg_secret_key";
 
@@ -7,10 +8,16 @@ export const loginUser = async (req, res) => {
   try {
     const { username, password, role } = req.body;
 
-    if (!username || !password)
+    if (!username || !password || !role)
       return res.status(400).json({ success: false, error: "Missing credentials" });
 
-    const userRef = db.collection("users").doc(username);
+    // Determine collection based on role
+    let collection = null;
+    if (role === 'admin') collection = 'admin';
+    else if (role === 'viewer') collection = 'viewers';
+    else return res.status(400).json({ success: false, error: "Invalid role" });
+
+    const userRef = db.collection(collection).doc(username);
     const userSnap = await userRef.get();
 
     if (!userSnap.exists)
@@ -18,21 +25,34 @@ export const loginUser = async (req, res) => {
 
     const user = userSnap.data();
 
-    // ROLE CHECK
-    if (user.role !== role) {
-      return res.status(401).json({
-        success: false,
-        error: `You must select '${user.role}' role to login`,
-      });
+    // ROLE CHECK (admin: must have 'admin' in roles or role === 'Admin', viewer: must have 'viewer')
+    if (role === 'admin') {
+      const hasAdminRole = (Array.isArray(user.roles) && user.roles.includes('admin')) || user.role === 'Admin' || user.role === 'admin';
+      if (!hasAdminRole) {
+        return res.status(401).json({
+          success: false,
+          error: `You must select 'admin' role to login`,
+        });
+      }
+    }
+    if (role === 'viewer') {
+      const hasViewerRole = (Array.isArray(user.roles) && user.roles.includes('viewer')) || user.role === 'Viewer' || user.role === 'viewer';
+      if (!hasViewerRole) {
+        return res.status(401).json({
+          success: false,
+          error: `You must select 'viewer' role to login`,
+        });
+      }
     }
 
-    // TEMPORARY — PLAIN PASSWORD CHECK
-    if (password !== user.password) {
+    // Password check (bcrypt)
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
       return res.status(401).json({ success: false, error: "Invalid password" });
     }
 
     const token = jwt.sign(
-      { username: user.username, role: user.role },
+      { username: user.username, role },
       JWT_SECRET,
       { expiresIn: "8h" }
     );

@@ -293,7 +293,6 @@ export default function DailyDamages() {
       outlets.forEach((o) => (f[o] = 0));
       return f;
     });
-    remapDamagesForOutlets(outlets);
   }, [outlets]);
 
   useEffect(() => {
@@ -370,7 +369,7 @@ export default function DailyDamages() {
     setIsEntryCalendarOpen(false);
   };
 
-  const save = () => {
+  const save = async () => {
     const total = outlets.reduce((s, name) => s + Number(form[name] || 0), 0);
     const success = addDamage({
       date: entryDate,
@@ -380,6 +379,16 @@ export default function DailyDamages() {
     if (!success) {
       alert(`Entry for ${entryDate} already exists and cannot be modified.`);
       return;
+    }
+    // Save to backend for persistence
+    try {
+      await fetch("/api/daily-damage/add-daily-damage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: entryDate, damages: { ...form }, total }),
+      });
+    } catch (err) {
+      // Ignore backend error for now, since local state is updated
     }
     alert(`Saved entry for ${entryDate}`);
     setHasEntry(true);

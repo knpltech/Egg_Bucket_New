@@ -1,16 +1,81 @@
+
 import { useEffect, useState } from "react";
 import { useDamage } from "../context/DamageContext";
 
+
 export default function AdminDashboard() {
-  const { totalDamages } = useDamage();
+  const { damages } = useDamage();
   const [totalOutlets, setTotalOutlets] = useState(0);
+  const [eggsToday, setEggsToday] = useState(0);
+  const [neccRate, setNeccRate] = useState('₹0.00');
+  const [damagesThisWeek, setDamagesThisWeek] = useState(0);
 
   useEffect(() => {
+    // Outlets
     const data = localStorage.getItem("egg_outlets_v1");
+    let outlets = [];
     if (data) {
-      setTotalOutlets(JSON.parse(data).length);
+      outlets = JSON.parse(data);
     }
-  }, []);
+    // If no outlets in localStorage, fetch from backend
+    if (!Array.isArray(outlets) || outlets.length === 0) {
+      fetch("/api/outlets/all")
+        .then(res => res.json())
+        .then(list => {
+          const activeOutlets = Array.isArray(list)
+            ? list.filter(o => o.status === "Active").length
+            : 0;
+          setTotalOutlets(activeOutlets);
+        });
+    } else {
+      const activeOutlets = outlets.filter(o => o.status === "Active").length;
+      setTotalOutlets(activeOutlets);
+    }
+
+    // Eggs distributed today
+    const fetchEggsToday = async () => {
+      try {
+        const res = await fetch("/api/dailysales/all");
+        const sales = await res.json();
+        const today = new Date().toISOString().slice(0, 10);
+        const todayRow = Array.isArray(sales) ? sales.find(r => r.date === today) : null;
+        setEggsToday(todayRow && !isNaN(Number(todayRow.total)) ? Number(todayRow.total) : 0);
+      } catch {
+        setEggsToday(0);
+      }
+    };
+    fetchEggsToday();
+
+    // NECC Rate (latest)
+    const fetchNeccRate = async () => {
+      try {
+        const res = await fetch("/api/neccrate/all");
+        const rates = await res.json();
+        let latest = null;
+        if (Array.isArray(rates) && rates.length > 0) {
+          latest = rates.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b);
+        }
+        let rateNum = 0;
+        if (latest && latest.rate) {
+          // Extract numeric value from string like '₹5.80 per egg'
+          const match = String(latest.rate).replace(/,/g, '').match(/([\d.]+)/);
+          if (match) rateNum = Number(match[1]);
+        }
+        if (!isFinite(rateNum) || isNaN(rateNum)) rateNum = 0;
+        setNeccRate(`₹${rateNum.toFixed(2)}`);
+      } catch {
+        setNeccRate('₹0.00');
+      }
+    };
+    fetchNeccRate();
+
+    // Damages today
+    const today = new Date().toISOString().slice(0, 10);
+    const damagesToday = Array.isArray(damages)
+      ? damages.find(d => d.date === today)
+      : null;
+    setDamagesThisWeek(damagesToday && !isNaN(Number(damagesToday.total)) ? Number(damagesToday.total) : 0);
+  }, [damages]);
 
   return (
     <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex flex-col">
@@ -39,21 +104,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stat Cards */}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-
-        <StatCard title="Total Eggs Distributed Today" value="12,540" icon="🥚" />
-
-        {/* ✅ FIXED: dynamic outlet count */}
+        <StatCard title="Total Eggs Distributed Today" value={eggsToday} icon="🥚" />
         <StatCard title="Total Outlets" value={totalOutlets} icon="🏪" />
-
-        <StatCard
-          title="Damages This Week"
-          value={totalDamages}
-          icon="📉"
-        />
-
-        <StatCard title="Today's NECC Rate" value="₹5.20" icon="📈" />
-
+        <StatCard title="Damages Today" value={damagesThisWeek} icon="📉" />
+        <StatCard title="Today's NECC Rate" value={neccRate} icon="📈" />
       </div>
 
       {/* Achievements */}

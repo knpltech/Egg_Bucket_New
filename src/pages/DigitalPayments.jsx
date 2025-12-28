@@ -338,16 +338,24 @@ export default function DigitalPayment() {
     };
   }, []);
 
-  const ROWS_STORAGE_KEY = "egg_digital_rows_v1";
-  const [rows, setRows] = useState(() => {
-    const saved = localStorage.getItem(ROWS_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
 
-  // persist rows
+  const [rows, setRows] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Fetch digital payments from backend
   useEffect(() => {
-    localStorage.setItem(ROWS_STORAGE_KEY, JSON.stringify(rows));
-  }, [rows]);
+    const fetchPayments = async () => {
+      try {
+        const res = await fetch("/api/digital-payments/all");
+        const data = await res.json();
+        setRows(Array.isArray(data) ? data : []);
+      } catch {
+        setRows([]);
+      }
+      setIsLoaded(true);
+    };
+    fetchPayments();
+  }, []);
 
   // If outlets change, remap existing rows so they include all current outlets (missing ones filled with 0) and totals recalculated
   useEffect(() => {
@@ -489,7 +497,8 @@ export default function DigitalPayment() {
     }));
   };
 
-  const handleSaveEntry = (e) => {
+
+  const handleSaveEntry = async (e) => {
     e.preventDefault();
     if (!entryDate) {
       alert("Please select a date.");
@@ -509,34 +518,19 @@ export default function DigitalPayment() {
       outletAmounts[area] = Number(entryValues[area]) || 0;
     });
 
-    const totalAmount = Object.values(outletAmounts).reduce(
-      (sum, v) => sum + v,
-      0
-    );
-
-    // Check if entry for this date already exists
-    const existingEntryIndex = rows.findIndex((row) => row.date === entryDate);
-
-    if (existingEntryIndex !== -1) {
-      // Update existing entry
-      setRows((prev) => {
-        const updated = [...prev];
-        updated[existingEntryIndex] = {
-          ...updated[existingEntryIndex],
-          outlets: outletAmounts,
-          totalAmount,
-        };
-        return updated;
+    // Save to backend
+    try {
+      await fetch("/api/digital-payments/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: entryDate, outlets: outletAmounts }),
       });
-    } else {
-      // Create new entry
-      const newRow = {
-        id: rows.length + 1,
-        date: entryDate,
-        outlets: outletAmounts,
-        totalAmount,
-      };
-      setRows((prev) => [newRow, ...prev]);
+      // Refetch from backend after adding
+      const res = await fetch("/api/digital-payments/all");
+      const data = await res.json();
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // Ignore backend error for now
     }
 
     setPage(1);
@@ -734,7 +728,11 @@ export default function DigitalPayment() {
                     );
                   })}
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
-                    {formatCurrencyTwoDecimals(row.totalAmount)}
+                    {formatCurrencyTwoDecimals(
+                      typeof row.totalAmount === 'number'
+                        ? row.totalAmount
+                        : Object.values(row.outlets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
+                    )}
                   </td>
                 </tr>
               ))}
@@ -748,7 +746,18 @@ export default function DigitalPayment() {
                     <td key={area} className="whitespace-nowrap px-4 py-3">{formatCurrencyTwoDecimals(total)}</td>
                   );
                 })}
-                <td className="whitespace-nowrap px-4 py-3 text-right">{formatCurrencyTwoDecimals(rows.reduce((sum, r) => sum + (r.totalAmount || 0), 0))}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-right">
+                  {formatCurrencyTwoDecimals(
+                    rows.reduce(
+                      (sum, r) => sum + (
+                        typeof r.totalAmount === 'number'
+                          ? r.totalAmount
+                          : Object.values(r.outlets || {}).reduce((s, v) => s + (Number(v) || 0), 0)
+                      ),
+                      0
+                    )
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -823,7 +832,15 @@ export default function DigitalPayment() {
               {hasEntry && (
                 <div className="mt-2 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <div className="text-xs font-medium text-green-700">Entry ( ₹ {entryTotal}) • Locked</div>
+                  <div className="text-xs font-medium text-green-700">
+                    Entry (
+                    {formatCurrencyTwoDecimals(
+                      entryTotal && entryTotal > 0
+                        ? entryTotal
+                        : Object.values(entryValues || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
+                    )}
+                    ) • Locked
+                  </div>
                 </div>
               )}
               {isEntryCalendarOpen && (

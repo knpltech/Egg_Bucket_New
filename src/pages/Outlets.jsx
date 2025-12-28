@@ -152,6 +152,24 @@ export default function Outlets() {
     return saved ? JSON.parse(saved) : SAMPLE_OUTLETS;
   });
 
+  // On first mount, store all outlets in the database if not already present
+  useEffect(() => {
+    async function syncToBackend() {
+      for (const outlet of outlets) {
+        try {
+          await fetch("/api/outlets/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(outlet),
+          });
+        } catch (err) {
+          // ignore network errors for now
+        }
+      }
+    }
+    syncToBackend();
+  }, []);
+
   // Persist to localStorage when outlets change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(outlets));
@@ -231,9 +249,14 @@ const handleOpenEditModal = (outlet) => {
   setOpenActionId(null);
 };
 
-const handleDeleteOutlet = (id) => {
+const handleDeleteOutlet = async (id) => {
   if (!confirm("Are you sure you want to delete this outlet?")) return;
-  setOutlets((prev) => prev.filter((o) => o.id !== id));
+  try {
+    await fetch(`/api/outlets/delete/${id}`, { method: "DELETE" });
+    setOutlets((prev) => prev.filter((o) => o.id !== id));
+  } catch (err) {
+    alert("Failed to delete outlet from backend.");
+  }
   setOpenActionId(null);
 };
 
@@ -295,7 +318,7 @@ const handleDeleteOutlet = (id) => {
     setShowAddModal(true);
   };
 
-  const handleSaveNewOutlet = (e) => {
+  const handleSaveNewOutlet = async (e) => {
     e.preventDefault();
     if (!newOutlet.name || !newOutlet.area) {
       alert("Please fill Outlet Name and Area.");
@@ -303,26 +326,33 @@ const handleDeleteOutlet = (id) => {
     }
 
     if (isEditMode && editingId) {
-      setOutlets((prev) =>
-        prev.map((o) =>
-          o.id === editingId
-            ? {
-                ...o,
-                name: newOutlet.name,
-                area: newOutlet.area,
-                contact: newOutlet.contact || "-",
-                phone: newOutlet.phone || "-",
-                status: newOutlet.status,
-              }
-            : o
-        )
-      );
+      // Edit existing outlet
+      const updatedOutlet = {
+        id: editingId,
+        name: newOutlet.name,
+        area: newOutlet.area,
+        contact: newOutlet.contact || "-",
+        phone: newOutlet.phone || "-",
+        status: newOutlet.status,
+      };
+      try {
+        await fetch("/api/outlets/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updatedOutlet),
+        });
+        setOutlets((prev) =>
+          prev.map((o) => (o.id === editingId ? { ...o, ...updatedOutlet } : o))
+        );
+      } catch (err) {
+        alert("Failed to update outlet in backend.");
+      }
       setIsEditMode(false);
       setEditingId(null);
     } else {
+      // Add new outlet
       const nextNumber = outlets.length + 1;
       const id = `OUT-${String(nextNumber).padStart(3, "0")}`;
-
       const outletToAdd = {
         id,
         name: newOutlet.name,
@@ -332,11 +362,18 @@ const handleDeleteOutlet = (id) => {
         status: "Inactive",
         reviewStatus: "pending",
       };
-
-      setOutlets((prev) => [outletToAdd, ...prev]);
-      setPage(1);
+      try {
+        await fetch("/api/outlets/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(outletToAdd),
+        });
+        setOutlets((prev) => [outletToAdd, ...prev]);
+        setPage(1);
+      } catch (err) {
+        alert("Failed to add outlet to backend.");
+      }
     }
-
     setShowAddModal(false);
   };
 
@@ -569,16 +606,24 @@ const handleDeleteOutlet = (id) => {
 
                       {openActionId === outlet.id && (
                         <div data-action-menu className="absolute right-0 mt-2 w-36 rounded-lg border bg-white shadow-lg z-30 text-xs">
+
                           <button
                             type="button"
-                            onClick={() => {
-                              setOutlets((prev) =>
-                                prev.map((o) =>
-                                  o.id === outlet.id
-                                    ? { ...o, status: "Active" }
-                                    : o
-                                )
-                              );
+                            onClick={async () => {
+                              try {
+                                await fetch("/api/outlets/add", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ ...outlet, status: "Active" }),
+                                });
+                                setOutlets((prev) =>
+                                  prev.map((o) =>
+                                    o.id === outlet.id ? { ...o, status: "Active" } : o
+                                  )
+                                );
+                              } catch (err) {
+                                alert("Failed to update status in backend.");
+                              }
                               setOpenActionId(null);
                             }}
                             className="block w-full text-left px-3 py-2 hover:bg-gray-100"
@@ -587,14 +632,21 @@ const handleDeleteOutlet = (id) => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setOutlets((prev) =>
-                                prev.map((o) =>
-                                  o.id === outlet.id
-                                    ? { ...o, status: "Inactive" }
-                                    : o
-                                )
-                              );
+                            onClick={async () => {
+                              try {
+                                await fetch("/api/outlets/add", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ ...outlet, status: "Inactive" }),
+                                });
+                                setOutlets((prev) =>
+                                  prev.map((o) =>
+                                    o.id === outlet.id ? { ...o, status: "Inactive" } : o
+                                  )
+                                );
+                              } catch (err) {
+                                alert("Failed to update status in backend.");
+                              }
                               setOpenActionId(null);
                             }}
                             className="block w-full text-left px-3 py-2 text-red-600 hover:bg-gray-100"

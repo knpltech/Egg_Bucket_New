@@ -114,19 +114,21 @@ const Dailysales = () => {
     };
   }, []);
   
-  useEffect(()=>{
-    const savedDate= localStorage.getItem(STORAGE_KEY);
-    if(savedDate){
-      setRows(JSON.parse(savedDate));
-    }
-    setIsLoaded(true);
-  },[]);
 
-  useEffect(()=>{
-    if(isLoaded){
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows))
-    }
-  },[rows,isLoaded]);
+  // Fetch daily sales from backend
+  useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const res = await fetch("/api/dailysales/all");
+        const data = await res.json();
+        setRows(Array.isArray(data) ? data : []);
+      } catch {
+        setRows([]);
+      }
+      setIsLoaded(true);
+    };
+    fetchSales();
+  }, []);
 
   // If outlets change, remap existing rows to include all current outlets
   useEffect(() => {
@@ -149,16 +151,22 @@ const Dailysales = () => {
   .filter(r => r.locked)
   .map(r => r.date);
 
-  const addrow=(newrow)=>{
-    setRows(prev => {
-      // Prevent duplicate date entries
-      if (prev.some(r => r.date === newrow.date)) {
-        alert('');
-        return prev;
-      }
-      return [newrow, ...prev];
-    });
-  }
+  const addrow = async (newrow) => {
+    // Save to backend for persistence
+    try {
+      await fetch("/api/dailysales/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newrow),
+      });
+      // Refetch from backend after adding
+      const res = await fetch("/api/dailysales/all");
+      const data = await res.json();
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      // Ignore backend error for now
+    }
+  };
 
   // Sort rows by date ascending (oldest to newest)
   const sortedRows = [...rows].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -198,7 +206,7 @@ const Dailysales = () => {
 
       <Topbar/>
       <Dailyheader dailySalesData={rows}/>
-      <DailyTable rows={rows} outlets={outlets}/>
+      <DailyTable rows={sortedRows} outlets={outlets}/>
       <div className="grid grid-cols-3 gap-6 mt-10">
 
         {/* Entry Form (biggest block) */}
