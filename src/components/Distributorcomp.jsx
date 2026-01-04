@@ -62,7 +62,12 @@ const Distributorcomp = () => {
       icon: faArrowsSplitUpAndLeft,
       desc: "total eggs damaged.",
     },
-    // Viewer role removed from selection
+    {
+      name: "Viewer",
+      value: "viewer",
+      icon: faUser,
+      desc: "View-only access to all modules.",
+    },
   ];
   const handleSubmit = async () => {
     // Basic validation
