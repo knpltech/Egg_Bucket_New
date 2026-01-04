@@ -364,6 +364,18 @@ export default function NeccTableSection({rows,
                 <td className="py-3 px-4">{row.date}</td>
                 <td className="py-3 px-4">{row.rate}</td>
                 <td className="py-3 px-4">{row.remarks}</td>
+                {typeof window !== 'undefined' && localStorage.getItem('user') && (() => {
+                  const user = JSON.parse(localStorage.getItem('user'));
+                  const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
+                  if (isAdmin && typeof window.onNeccEdit === 'function') {
+                    return (
+                      <td className="py-3 px-4">
+                        <button className="text-blue-600 hover:underline text-xs font-medium" onClick={() => window.onNeccEdit(row)}>Edit</button>
+                      </td>
+                    );
+                  }
+                  return null;
+                })()}
               </tr>
             ))
           )}

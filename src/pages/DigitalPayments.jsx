@@ -1,7 +1,9 @@
-const API_URL = import.meta.env.VITE_API_URL;
-// src/pages/DigitalPayment.jsx
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
+const API_URL = import.meta.env.VITE_API_URL;
+// src/pages/DigitalPayment.jsx
+
+// Edit modal state and handlers must be inside the component body, after imports
 
 const DEFAULT_OUTLETS = [
   "AECS Layout",
@@ -298,7 +300,69 @@ function BaseCalendar({ rows, selectedDate, onSelectDate, showDots }) {
 }
 /* ----------------------------------------------- */
 
-export default function DigitalPayment() {
+export default function DigitalPayments() {
+  // Get user from localStorage and check admin
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem("user"));
+  } catch {}
+  const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
+
+  // --- Edit Modal State ---
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editRow, setEditRow] = useState({});
+  const [editValues, setEditValues] = useState({});
+
+  // Open modal and set values for editing
+  const handleEditClick = (row) => {
+    setEditRow(row);
+    setEditValues({ ...(row.outlets || {}) });
+    setEditModalOpen(true);
+  };
+
+  // Handle value change in modal
+  const handleEditValueChange = (area, value) => {
+    setEditValues((prev) => ({ ...prev, [area]: value }));
+  };
+
+  // Cancel edit
+  const handleEditCancel = () => {
+    setEditModalOpen(false);
+    setEditRow({});
+    setEditValues({});
+  };
+
+  // Save edit
+  const handleEditSave = async () => {
+    if (!editRow.id) return;
+    const updatedOutlets = {};
+    outlets.forEach((o) => {
+      const area = o.area || o;
+      updatedOutlets[area] = Number(editValues[area]) || 0;
+    });
+    try {
+      const response = await fetch(`${API_URL}/api/digital-payments/${editRow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: editRow.date, outlets: updatedOutlets }),
+      });
+      if (!response.ok) {
+        alert("Failed to update entry");
+        return;
+      }
+      // Refetch rows after update
+      const res = await fetch(`${API_URL}/api/digital-payments/all`);
+      const data = await res.json();
+      setRows(Array.isArray(data) ? data : []);
+      setEditModalOpen(false);
+      setEditRow({});
+      setEditValues({});
+    } catch (err) {
+      alert("Error updating entry");
+    }
+  };
+
+  const [rows, setRows] = useState([]);
   const [outlets, setOutlets] = useState([]);
 
   useEffect(() => {
@@ -311,30 +375,8 @@ export default function DigitalPayment() {
     };
 
     loadOutletsFromLocal();
-
-    const onUpdate = (e) => {
-      const outletsList = (e && e.detail && Array.isArray(e.detail)) ? e.detail : null;
-      if (outletsList) {
-        setOutlets(outletsList);
-      } else {
-        loadOutletsFromLocal();
-      }
-    };
-
-    window.addEventListener('egg:outlets-updated', onUpdate);
-
-    const onStorage = (evt) => {
-      if (evt.key === STORAGE_KEY) onUpdate();
-    };
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      window.removeEventListener('egg:outlets-updated', onUpdate);
-      window.removeEventListener('storage', onStorage);
-    };
   }, []);
 
-  const [rows, setRows] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Fetch digital payments from backend
@@ -444,15 +486,9 @@ export default function DigitalPayment() {
     }
   }, [entryDate, rows, outlets]);
 
+  // Always show the latest 6 entries, regardless of date
   const filteredRows = useMemo(() => {
-    // Only show last 10 days
-    const today = new Date();
-    const tenDaysAgo = new Date(today);
-    tenDaysAgo.setDate(today.getDate() - 9);
-    let filtered = rows.filter(row => {
-      const d = new Date(row.date);
-      return d >= tenDaysAgo && d <= today;
-    });
+    let filtered = [...rows];
     // Optionally, apply additional filters (date range)
     let from = filterFrom ? new Date(filterFrom) : null;
     let to = filterTo ? new Date(filterTo) : null;
@@ -461,7 +497,8 @@ export default function DigitalPayment() {
         const d = new Date(row.date);
         return d >= from && d <= to;
       });
-    return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Sort by date ascending, then take the last 6
+    return filtered.sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-6);
   }, [rows, filterFrom, filterTo]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -705,6 +742,9 @@ export default function DigitalPayment() {
                 <th className="px-4 py-3 whitespace-nowrap text-right">
                   TOTAL AMOUNT
                 </th>
+                {isAdmin && (
+                  <th className="px-4 py-3 whitespace-nowrap text-right">Edit</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -736,6 +776,59 @@ export default function DigitalPayment() {
                         : Object.values(row.outlets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
                     )}
                   </td>
+                  {isAdmin && (
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {isAdmin ? (
+                        <button
+                          className="text-blue-600 hover:underline text-xs font-medium"
+                          onClick={() => handleEditClick(row)}
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-xs font-medium flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="inline h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.104.896-2 2-2s2 .896 2 2v2m-4 0v2m0 0h4m-4 0H8m4-6V7a4 4 0 10-8 0v4a4 4 0 008 0z" /></svg>
+                          Locked
+                        </span>
+                      )}
+                    </td>
+                  )}
+                      {/* Edit Modal */}
+                      {editModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+                          <div className="bg-white rounded-xl shadow-lg p-6 min-w-[320px] max-w-full">
+                            <h2 className="text-lg font-semibold mb-4">Edit Digital Payment ({formatDisplayDate(editRow.date)})</h2>
+                            <div className="space-y-3">
+                              {outlets.map((outlet) => {
+                                const area = outlet.area || outlet;
+                                return (
+                                  <div key={area} className="flex items-center gap-2">
+                                    <label className="w-32 text-xs font-medium text-gray-700">{area.toUpperCase()}</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={editValues[area] || ""}
+                                      onChange={e => handleEditValueChange(area, e.target.value)}
+                                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex justify-end gap-2 mt-6">
+                              <button
+                                onClick={handleEditCancel}
+                                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-300"
+                              >Cancel</button>
+                              <button
+                                onClick={handleEditSave}
+                                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600"
+                              >Save</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                 </tr>
               ))}
               {/* Grand Total Row */}

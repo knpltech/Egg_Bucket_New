@@ -1,15 +1,15 @@
-// Get all viewers from Firestore
-export const getAllViewers = async (req, res) => {
+// Get all data agents from Firestore
+export const getAllDataAgents = async (req, res) => {
   try {
-    const snapshot = await db.collection("viewers").get();
-    const viewers = snapshot.docs.map(doc => {
+    const snapshot = await db.collection("dataagents").get();
+    const dataagents = snapshot.docs.map(doc => {
       const data = doc.data();
       delete data.password;
       return { id: doc.id, ...data };
     });
-    res.status(200).json(viewers);
+    res.status(200).json(dataagents);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching viewers", error: error.message });
+    res.status(500).json({ message: "Error fetching data agents", error: error.message });
   }
 };
 // Get all distributors from Firestore
@@ -27,6 +27,20 @@ export const getAllDistributors = async (req, res) => {
   }
 };
 // Get all admin users from Firestore
+// Get all viewers from Firestore
+export const getAllViewers = async (req, res) => {
+  try {
+    const snapshot = await db.collection("viewers").get();
+    const viewers = snapshot.docs.map(doc => {
+      const data = doc.data();
+      delete data.password;
+      return { id: doc.id, ...data };
+    });
+    res.status(200).json(viewers);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching viewers", error: error.message });
+  }
+};
 export const getAllUsers = async (req, res) => {
   try {
     const snapshot = await db.collection("admin").get();
@@ -54,19 +68,35 @@ export const addUser = async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
 
     if (fromDistributorPage) {
-      // Always store as viewer in viewers collection, but include access roles
-      const viewerData = {
-        username,
-        password: hashed,
-        fullName: fullName || "",
-        phone: phone || "",
-        role:"Viewer",
-        roles: Array.isArray(roles) && roles.length > 0 ? roles : ["viewer"],
-        createdAt: new Date()
-      };
-      console.log('Creating viewer from distributor page:', { username, roles: viewerData.roles });
-      await db.collection('viewers').doc(username).set(viewerData);
-      return res.json({ success: true, message: `Viewer created successfully in viewers collection` });
+      // If only 'viewer' role, add to viewers collection
+      if (Array.isArray(roles) && roles.length === 1 && roles[0] === "viewer") {
+        const viewerData = {
+          username,
+          password: hashed,
+          fullName: fullName || "",
+          phone: phone || "",
+          role: "Viewer",
+          roles: ["viewer"],
+          createdAt: new Date()
+        };
+        console.log('Creating viewer from distributor page:', { username, roles: viewerData.roles });
+        await db.collection('viewers').doc(username).set(viewerData);
+        return res.json({ success: true, message: `Viewer created successfully in viewers collection` });
+      } else {
+        // Otherwise, add to dataagents collection
+        const dataAgentData = {
+          username,
+          password: hashed,
+          fullName: fullName || "",
+          phone: phone || "",
+          role: "DataAgent",
+          roles: Array.isArray(roles) && roles.length > 0 ? roles : ["dataagent"],
+          createdAt: new Date()
+        };
+        console.log('Creating data agent from distributor page:', { username, roles: dataAgentData.roles });
+        await db.collection('dataagents').doc(username).set(dataAgentData);
+        return res.json({ success: true, message: `DataAgent created successfully in dataagents collection` });
+      }
     }
 
     // Otherwise, treat as admin (manual entry)

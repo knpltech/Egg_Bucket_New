@@ -14,8 +14,6 @@ export default function SignIn() {
 
   const navigate = useNavigate();
 
-  console.log("API_URL in SignIn.jsx:", API_URL); // Debugging line
-
   const handleSignin = async () => {
     if (!username || !password) {
       alert("Enter username & password");
@@ -42,6 +40,7 @@ export default function SignIn() {
 
       if (contentType && contentType.includes("application/json")) {
         data = await res.json();
+        console.log("Login response:", data); // Debug log
       } else {
         const text = await res.text();
         console.error("Non-JSON response from server:", text);
@@ -64,9 +63,11 @@ export default function SignIn() {
       // Redirect
       if (data.user.role === "Admin") {
         navigate("/admin/dashboard");
+      } else if (data.user.role === "Viewer") {
+        navigate("/viewer/data");
       } else {
         navigate("/dashboard");
-        // Viewer: redirect to first allowed feature
+        // DataAgent: redirect to first allowed feature
         const roles = Array.isArray(data.user.roles) ? data.user.roles : (data.user.role ? [data.user.role] : []);
         // Map roles to paths in order of preference
         const roleToPath = {
@@ -158,7 +159,8 @@ export default function SignIn() {
             className="w-full p-3 rounded-xl bg-eggInput outline-none shadow"
           >
             <option value="admin">Admin</option>
-            <option value="viewer">Viewer</option>
+            <option value="dataagent">Data Agent</option>
+              <option value="viewer">Viewer</option>
           </select>
 
           <button

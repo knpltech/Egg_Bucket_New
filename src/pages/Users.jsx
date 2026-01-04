@@ -12,9 +12,9 @@ const Users = () => {
     // Delete user handler
     const handleDeleteUser = async (id, username, roles) => {
       if (!window.confirm('Are you sure you want to delete this user?')) return;
-      // Determine collection: viewers if roles includes 'viewer', else users
-      const isViewer = (Array.isArray(roles) ? roles : [roles]).some(r => (r || '').toLowerCase() === 'viewer');
-      const collection = isViewer ? 'viewers' : 'users';
+      // Determine collection: dataagents if roles includes 'dataagent', else users
+      const isDataAgent = (Array.isArray(roles) ? roles : [roles]).some(r => (r || '').toLowerCase() === 'dataagent');
+      const collection = isDataAgent ? 'dataagents' : 'users';
       try {
         const response = await fetch(`${API_URL}/api/admin/delete-user`, {
           method: 'POST',
@@ -86,7 +86,7 @@ const Users = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/admin/all-viewers`);
+        const res = await fetch(`${API_URL}/api/admin/all-dataagents`);
         const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
       } catch {

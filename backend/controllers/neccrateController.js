@@ -1,3 +1,16 @@
+// PATCH controller to update a NECC rate entry by ID
+export const updateNeccRate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const docRef = db.collection("neccRates").doc(id);
+    await docRef.update(updateData);
+    const updatedDoc = await docRef.get();
+    res.status(200).json({ id, ...updatedDoc.data() });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating NECC rate", error: error.message });
+  }
+};
 import { db } from "../config/firebase.js";
 
 // Add a new NECC rate entry to Firestore

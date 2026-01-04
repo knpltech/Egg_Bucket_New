@@ -1,3 +1,16 @@
+// PATCH controller to update a daily sales entry by ID
+export const updateDailySales = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const docRef = db.collection("dailySales").doc(id);
+    await docRef.update(updateData);
+    const updatedDoc = await docRef.get();
+    res.status(200).json({ id, ...updatedDoc.data() });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating daily sales", error: error.message });
+  }
+};
 import { db } from "../config/firebase.js";
 
 // Add a new daily sales entry to Firestore

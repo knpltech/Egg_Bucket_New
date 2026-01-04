@@ -66,6 +66,88 @@ const SAMPLE_OUTLETS = [
 ];
 
 const Dailysales = () => {
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editRow, setEditRow] = useState({});
+    const [editValues, setEditValues] = useState({});
+    // Fetch daily sales from backend (ensure id is present)
+    useEffect(() => {
+      const fetchSales = async () => {
+        try {
+          const res = await fetch(`${API_URL}/api/dailysales/all`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setRows(data.map(d => ({ id: d.id, ...d })));
+          } else if (data.success && Array.isArray(data.data)) {
+            setRows(data.data.map(d => ({ id: d.id, ...d })));
+          } else {
+            setRows([]);
+          }
+        } catch (err) {
+          setRows([]);
+        }
+        setIsLoaded(true);
+      };
+      fetchSales();
+    }, []);
+    // Open modal and set values for editing
+    const handleEditClick = (row) => {
+      const fullRow = { ...row };
+      if (!row.id) {
+        const found = rows.find(r => r.date === row.date);
+        if (found && found.id) fullRow.id = found.id;
+      }
+      setEditRow(fullRow);
+      setEditValues({ ...row.outlets });
+      setEditModalOpen(true);
+    };
+
+    // Handle value change in modal
+    const handleEditValueChange = (name, value) => {
+      setEditValues((prev) => ({ ...prev, [name]: Number(value) }));
+    };
+
+    // Cancel edit
+    const handleEditCancel = () => {
+      setEditModalOpen(false);
+      setEditRow({});
+      setEditValues({});
+    };
+
+    // Save edit
+    const handleEditSave = async () => {
+      if (!editRow.id) {
+        alert("No ID found for entry. Cannot update.");
+        return;
+      }
+      const updatedOutlets = { ...editValues };
+      const total = Object.values(updatedOutlets).reduce((s, v) => s + (Number(v) || 0), 0);
+      try {
+        const response = await fetch(`${API_URL}/api/dailysales/${editRow.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: editRow.date, outlets: updatedOutlets, total }),
+        });
+        if (!response.ok) {
+          alert("Failed to update entry: " + response.status);
+          return;
+        }
+        // Refetch sales after update
+        const res = await fetch(`${API_URL}/api/dailysales/all`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setRows(data.map(d => ({ id: d.id, ...d })));
+        } else if (data.success && Array.isArray(data.data)) {
+          setRows(data.data.map(d => ({ id: d.id, ...d })));
+        } else {
+          setRows([]);
+        }
+        setEditModalOpen(false);
+        setEditRow({});
+        setEditValues({});
+      } catch (err) {
+        alert("Error updating entry: " + err.message);
+      }
+    };
   const STORAGE_KEY = "dailySales_v2";
   const OUTLETS_KEY = "egg_outlets_v1";
 
@@ -193,15 +275,10 @@ const Dailysales = () => {
 
   // Sort rows by date ascending (oldest to newest)
   // Only show last 10 days
-  const today = new Date();
-  const tenDaysAgo = new Date(today);
-  tenDaysAgo.setDate(today.getDate() - 9); // includes today
-  const sortedRows = [...rows]
-    .filter(row => {
-      const d = new Date(row.date);
-      return d >= tenDaysAgo && d <= today;
-    })
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Always show the latest 6 entries, regardless of date
+    const sortedRows = [...rows]
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .slice(-6);
 
   // Download as Excel (robust for both possible row structures)
   const handleDownload = () => {
@@ -238,7 +315,43 @@ const Dailysales = () => {
 
       <Topbar/>
       <Dailyheader dailySalesData={rows}/>
-      <DailyTable rows={sortedRows} outlets={outlets}/>
+      <DailyTable rows={sortedRows} outlets={outlets} onEdit={handleEditClick}/>
+      {/* Edit Modal */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white rounded-xl shadow-lg p-6 min-w-[320px] max-w-full">
+            <h2 className="text-lg font-semibold mb-4">Edit Daily Sales ({editRow.date})</h2>
+            <div className="space-y-3">
+              {outlets.map((o) => {
+                const area = o.area || o;
+                return (
+                  <div key={area} className="flex items-center gap-2">
+                    <label className="w-32 text-xs font-medium text-gray-700">{area}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editValues[area] ?? 0}
+                      onChange={e => handleEditValueChange(area, e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={handleEditCancel}
+                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-300"
+              >Cancel</button>
+              <button
+                onClick={handleEditSave}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600"
+              >Save</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-6 mt-10">
 
         {/* Entry Form (biggest block) */}

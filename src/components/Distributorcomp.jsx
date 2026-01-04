@@ -58,19 +58,19 @@ const Distributorcomp = () => {
       desc: "Average amount of eggs.",
     },
     {
-      name: "Daily Damages",
-      value: "dailydamages",
-      icon: faArrowsSplitUpAndLeft,
-      desc: "total eggs damaged.",
+      name: "Daily Sales",
+      value: "daily_sales",
+      icon: faChartLine,
+      desc: "Manage daily egg sales records.",
     },
+    // ...existing code...
     {
       name: "Viewer",
       value: "viewer",
-      icon: faUser,
-      desc: "View-only access to all modules.",
+      icon: faLock,
+      desc: "Read-only access to all data.",
     },
   ];
-
   const handleSubmit = async () => {
     // Basic validation
     if (!form.fullName || !form.username) {
@@ -82,6 +82,15 @@ const Distributorcomp = () => {
     }
 
     try {
+      // Ensure roles is always an array and only includes 'dataagent' if selected
+      let rolesArr = Array.isArray(form.roles) ? form.roles : String(form.roles || "").split(",").map(r => r.trim()).filter(Boolean);
+      // If only 'viewer' is selected, do not add 'dataagent'
+      if (rolesArr.length === 1 && rolesArr[0] === "viewer") {
+        rolesArr = ["viewer"];
+      } else {
+        if (!rolesArr.includes("dataagent")) rolesArr.push("dataagent");
+        rolesArr = Array.from(new Set(rolesArr)); // Remove duplicates
+      }
       const res = await fetch(`${API_URL}/api/admin/add-user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,7 +100,7 @@ const Distributorcomp = () => {
           username: form.username.trim(),
           password: form.password,
           fromDistributorPage: true,
-          roles: Array.isArray(form.roles) && form.roles.length > 0 ? [...form.roles, "viewer"] : ["viewer"]
+          roles: rolesArr
         }),
       });
 

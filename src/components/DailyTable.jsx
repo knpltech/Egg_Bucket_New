@@ -10,7 +10,7 @@ function formatDisplayDate(iso) {
   });
 }
 
-export default function DailyTable({rows, outlets = []}) {
+export default function DailyTable({rows, outlets = [], onEdit}) {
   // Build outlet names from objects or use defaults
   const outletNames = Array.isArray(outlets) && outlets.length > 0 
     ? outlets.map(o => (typeof o === 'string' ? o : o.area || o.name || o.id || JSON.stringify(o)))
@@ -50,6 +50,13 @@ export default function DailyTable({rows, outlets = []}) {
               <th className="px-4 py-3 whitespace-nowrap text-right">
                 Total
               </th>
+              {/* Edit column for admin */}
+              {typeof window !== 'undefined' && localStorage.getItem('user') && (() => {
+                const user = JSON.parse(localStorage.getItem('user'));
+                const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
+                if (isAdmin && typeof onEdit === 'function') return <th className="px-4 py-3">Edit</th>;
+                return null;
+              })()}
             </tr>
           </thead>
           <tbody>
@@ -75,6 +82,19 @@ export default function DailyTable({rows, outlets = []}) {
                 <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-orange-600">
                   ₹{row.total}
                 </td>
+                {/* Edit button for admin */}
+                {typeof window !== 'undefined' && localStorage.getItem('user') && (() => {
+                  const user = JSON.parse(localStorage.getItem('user'));
+                  const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
+                  if (isAdmin && typeof onEdit === 'function') {
+                    return (
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <button className="text-blue-600 hover:underline text-xs font-medium" onClick={() => onEdit(row)}>Edit</button>
+                      </td>
+                    );
+                  }
+                  return null;
+                })()}
               </tr>
             ))}
 

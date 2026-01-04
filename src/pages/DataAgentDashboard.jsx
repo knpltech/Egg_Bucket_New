@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import logo from "../assets/Logo.png";
 import { Link, useLocation } from "react-router-dom";
 
-export default function ViewerDashboard() {
+export default function DataAgentDashboard() {
   let user = null;
   try {
     user = JSON.parse(localStorage.getItem("user"));
@@ -17,6 +17,8 @@ export default function ViewerDashboard() {
     { role: "cash_payments", name: "Cash Payments", path: "/admin/cash-payments" },
     { role: "neccrate", name: "NECC Rate", path: "/admin/neccrate" },
     { role: "daily_damages", name: "Daily Damages", path: "/admin/damages" },
+    // Support legacy role value for backward compatibility
+    { role: "dailydamages", name: "Daily Damages", path: "/admin/damages" },
   ];
 
   // Stat state
@@ -134,7 +136,12 @@ export default function ViewerDashboard() {
           <h1 className="text-xl font-bold text-gray-800">Egg Bucket</h1>
         </div>
         <div className="space-y-3 text-gray-700 font-medium">
-          {sidebarItems.filter(item => roles.includes(item.role)).map(item => (
+          {sidebarItems.filter(item => {
+            if (item.role === "daily_damages") {
+              return roles.includes("daily_damages") || roles.includes("dailydamages");
+            }
+            return roles.includes(item.role);
+          }).map(item => (
             <Link key={item.role} to={item.path} className="block">
               <SidebarItem name={item.name} active={location.pathname === item.path} />
             </Link>

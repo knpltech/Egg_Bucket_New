@@ -3,6 +3,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 
+import DailyTable from "../components/DailyTable";
+
 const DEFAULT_OUTLETS = [
   "AECS Layout",
   "Bandepalya",
@@ -256,6 +258,63 @@ function CashCalendar({ rows, selectedDate, onSelectDate, showDots = true }) {
 /* ------------------------------------------------ */
 
 export default function CashPayments() {
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editRow, setEditRow] = useState({});
+    const [editValues, setEditValues] = useState({});
+
+    // Open modal and set values for editing
+    const handleEditClick = (row) => {
+      const fullRow = { ...row };
+      if (!row.id) {
+        const found = rows.find(r => r.date === row.date);
+        if (found && found.id) fullRow.id = found.id;
+      }
+      setEditRow(fullRow);
+      setEditValues({ ...row.outlets });
+      setEditModalOpen(true);
+    };
+
+    // Handle value change in modal
+    const handleEditValueChange = (name, value) => {
+      setEditValues((prev) => ({ ...prev, [name]: Number(value) }));
+    };
+
+    // Cancel edit
+    const handleEditCancel = () => {
+      setEditModalOpen(false);
+      setEditRow({});
+      setEditValues({});
+    };
+
+    // Save edit
+    const handleEditSave = async () => {
+      if (!editRow.id) {
+        alert("No ID found for entry. Cannot update.");
+        return;
+      }
+      const updatedOutlets = { ...editValues };
+      const totalAmount = Object.values(updatedOutlets).reduce((s, v) => s + (Number(v) || 0), 0);
+      try {
+        const response = await fetch(`${API_URL}/api/cash-payments/${editRow.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: editRow.date, outlets: updatedOutlets, totalAmount }),
+        });
+        if (!response.ok) {
+          alert("Failed to update entry: " + response.status);
+          return;
+        }
+        // Refetch payments after update
+        const res = await fetch(`${API_URL}/api/cash-payments/all`);
+        const data = await res.json();
+        setRows(Array.isArray(data) ? data : []);
+        setEditModalOpen(false);
+        setEditRow({});
+        setEditValues({});
+      } catch (err) {
+        alert("Error updating entry: " + err.message);
+      }
+    };
   const [outlets, setOutlets] = useState([]);
 
   useEffect(() => {
@@ -670,90 +729,44 @@ export default function CashPayments() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-2xl bg-eggWhite shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-left text-xs font-semibold text-gray-500">
-                <th className="min-w-[130px] px-4 py-3">Date</th>
-                {outlets.map((outlet) => {
-                  const area = outlet.area || outlet;
-                  const isActive = !outlet.status || outlet.status === "Active";
-                  return (
-                    <th key={area} className="px-4 py-3 whitespace-nowrap">
-                      {area.toUpperCase()}
-                      {!isActive && <span className="text-red-500 text-[10px] block">(Inactive)</span>}
-                    </th>
-                  );
-                })}
-                <th className="px-4 py-3 whitespace-nowrap text-right">
-                  TOTAL AMOUNT
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  className={`text-xs text-gray-700 md:text-sm ${
-                    idx % 2 === 0 ? "bg-white" : "bg-gray-50/60"
-                  }`}
-                >
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {formatDisplayDate(row.date)}
-                  </td>
-                  {outlets.map((outlet) => {
-                    const area = outlet.area || outlet;
-                    return (
-                      <td
-                        key={area}
-                        className="whitespace-nowrap px-4 py-3"
-                      >
-                        {formatCurrencyNoDecimals(row.outlets[area])}
-                      </td>
-                    );
-                  })}
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
-                    {formatCurrencyNoDecimals(
-                      typeof row.totalAmount === 'number'
-                        ? row.totalAmount
-                        : Object.values(row.outlets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
-                    )}
-                  </td>
-                </tr>
-              ))}
+      <DailyTable rows={filteredRows} outlets={outlets} onEdit={handleEditClick} />
 
-              <tr className="border-t border-orange-100 bg-orange-50 text-xs font-semibold text-gray-900 md:text-sm">
-                <td className="px-4 py-3">Total</td>
-                {outlets.map((outlet) => {
-                  const area = outlet.area || outlet;
-                  return (
-                    <td
-                      key={area}
-                      className="whitespace-nowrap px-4 py-3"
-                    >
-                      {formatCurrencyNoDecimals(totals.outletTotals[area] || 0)}
-                    </td>
-                  );
-                })}
-                <td className="whitespace-nowrap px-4 py-3 text-right">
-                  {formatCurrencyNoDecimals(
-                    filteredRows.reduce(
-                      (sum, r) => sum + (
-                        typeof r.totalAmount === 'number'
-                          ? r.totalAmount
-                          : Object.values(r.outlets || {}).reduce((s, v) => s + (Number(v) || 0), 0)
-                      ),
-                      0
-                    )
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Edit Modal */}
+      {editModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white rounded-xl shadow-lg p-6 min-w-[320px] max-w-full">
+            <h2 className="text-lg font-semibold mb-4">Edit Cash Payment ({editRow.date})</h2>
+            <div className="space-y-3">
+              {outlets.map((o) => {
+                const area = o.area || o;
+                return (
+                  <div key={area} className="flex items-center gap-2">
+                    <label className="w-32 text-xs font-medium text-gray-700">{area}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editValues[area] ?? 0}
+                      onChange={e => handleEditValueChange(area, e.target.value)}
+                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={handleEditCancel}
+                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-300"
+              >Cancel</button>
+              <button
+                onClick={handleEditSave}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600"
+              >Save</button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Entry Card */}
       <div className="mt-8 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">

@@ -14,10 +14,11 @@ import Outlets from "./pages/Outlets";
 import Users from "./pages/Users";
 import { Navigate } from "react-router-dom";
 
-import ViewerDashboard from "./pages/ViewerDashboard";
+import DataAgentDashboard from "./pages/DataAgentDashboard";
 import { DamageProvider } from "./context/DamageContext";
 import { PanelProvider } from "./context/PanelContext";
 import AdminLayoutWithPanel from "./layouts/AdminLayoutWithPanel";
+import ViewerData from "./pages/ViewerData";
 
 function ProtectedRoute({ element, requiredRole }) {
   let user = null;
@@ -25,11 +26,12 @@ function ProtectedRoute({ element, requiredRole }) {
     user = JSON.parse(localStorage.getItem("user"));
   } catch {}
   const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
-  const viewerRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
-  if (isAdmin || !requiredRole || viewerRoles.includes(requiredRole)) {
+  const isViewer = user && (user.role === "Viewer" || (Array.isArray(user.roles) && user.roles.includes("viewer")));
+  const dataAgentRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
+  if (isAdmin || !requiredRole || dataAgentRoles.includes(requiredRole) || isViewer) {
     return element;
   }
-  // Not allowed: redirect to viewer dashboard
+  // Not allowed: redirect to data agent dashboard
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -81,8 +83,11 @@ function App() {
               element={<ProtectedRoute element={<AdminLayoutWithPanel><Users /></AdminLayoutWithPanel>} requiredRole={null} />}
             />
 
-            {/* VIEWER */}
-            <Route path="/dashboard" element={<ViewerDashboard />} />
+            {/* DATA AGENT */}
+            <Route path="/dashboard" element={<DataAgentDashboard />} />
+
+            {/* VIEWER ROUTE */}
+            <Route path="/viewer/data" element={<ViewerData />} />
           </Routes>
         </BrowserRouter>
       </PanelProvider>

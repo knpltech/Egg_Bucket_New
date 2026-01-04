@@ -13,7 +13,7 @@ export const loginUser = async (req, res) => {
     if (!username || !password || !role)
       return res.status(400).json({ success: false, error: "Missing credentials" });
 
-    const collection = role === "admin" ? "admin" : role === "viewer" ? "viewers" : null;
+    const collection = role === "admin" ? "admin" : role === "dataagent" ? "dataagents" : role === "viewer" ? "viewers" : null;
     if (!collection)
       return res.status(400).json({ success: false, error: "Invalid role" });
 
@@ -29,6 +29,13 @@ export const loginUser = async (req, res) => {
       !(user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")))
     ) {
       return res.status(401).json({ success: false, error: "Admin access denied" });
+    }
+
+    if (
+      role === "dataagent" &&
+      !(user.role === "DataAgent" || (Array.isArray(user.roles) && user.roles.includes("dataagent")))
+    ) {
+      return res.status(401).json({ success: false, error: "DataAgent access denied" });
     }
 
     if (
