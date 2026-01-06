@@ -1,9 +1,9 @@
 // reportsApi.js
 // Frontend API service for fetching reports data from backend
 
-// Configuration - Update this with your actual backend URL
+// Configuration - Use Vite env variable or fallback to relative path for deployment compatibility
 const config = {
-  apiBaseUrl: 'http://localhost:5000/api' // Update with your backend URL
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '/api'
 };
 
 const API_BASE_URL = config.apiBaseUrl;
