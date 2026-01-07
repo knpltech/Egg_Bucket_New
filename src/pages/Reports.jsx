@@ -706,7 +706,7 @@ const Reports = () => {
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: '#ffebee' }}>
                     ⚠️
                   </div>
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Difference</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Damages</span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className={`text-3xl font-bold ${
