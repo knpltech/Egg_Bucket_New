@@ -540,112 +540,25 @@ export default function DailyDamages() {
     XLSX.writeFile(wb, "Daily_Damages_Report.xlsx");
   };
 
+  const handleQuickRange = (type) => {
+    const today = new Date();
+    const to = today.toISOString().slice(0, 10);
+    let fromDateVal;
+    if (type === "lastWeek") {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 7);
+      fromDateVal = d.toISOString().slice(0, 10);
+    } else if (type === "lastMonth") {
+      const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      fromDateVal = d.toISOString().slice(0, 10);
+    }
+    setFromDate(fromDateVal || "");
+    setToDate(to);
+  };
+
   return (
     
     <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex flex-col">
-      {/* Entry Section - moved to top */}
-      {(isAdmin || isDataAgent) && (
-        <div className="mb-8 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100">
-              <DamageEntryIcon className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-900 md:text-lg">
-                Daily Damages Entry
-              </h2>
-              <p className="text-xs text-gray-500 md:text-sm">
-                Add new egg damage amounts for each outlet.
-              </p>
-            </div>
-          </div>
-          <div className="space-y-5">
-            {/* Select Date */}
-            <div className="grid gap-4 md:grid-cols-[160px,1fr] md:items-center">
-              <label className="text-xs font-medium text-gray-700 md:text-sm">
-                Select Date
-              </label>
-              <div className="relative w-full" ref={entryCalendarRef}>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsEntryCalendarOpen((open) => !open)}
-                    className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-3 py-2 pr-10 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
-                  >
-                    <span>
-                      {entryDate ? formatDateDMY(entryDate) : "dd-mm-yyyy"}
-                    </span>
-                  </button>
-                  <CalendarIcon className="h-4 w-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-                {hasEntry && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <div className="text-xs font-medium text-green-700">
-                      Entry ({entryTotal}) • Locked
-                    </div>
-                  </div>
-                )}
-                {isEntryCalendarOpen && (
-                  <div className="absolute right-0 top-full z-30 mt-2">
-                    <BaseCalendar
-                      rows={damages}
-                      selectedDate={entryDate}
-                      onSelectDate={handleEntryDateSelect}
-                      showDots={true}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-            {/* Outlet inputs */}
-            <div className="grid gap-3 md:grid-cols-5">
-              {outlets.map((outlet) => (
-                <div key={outlet} className="space-y-1">
-                  <p className="text-xs font-medium text-gray-600">
-                    {outlet}
-                  </p>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={form[outlet] ?? 0}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          [outlet]: Number(e.target.value),
-                        }))
-                      }
-                      disabled={hasEntry}
-                      className={`w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm ${
-                        hasEntry ? "bg-gray-50 cursor-not-allowed" : ""
-                      }`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Save button */}
-            <div className="flex flex-col items-center gap-2 pt-4">
-              <button
-                type="button"
-                onClick={save}
-                disabled={hasEntry}
-                className={`inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md ${
-                  hasEntry
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-orange-500 hover:bg-orange-600"
-                }`}
-              >
-                {hasEntry ? "Locked" : "Save Entry"}
-              </button>
-              <p className="text-center text-[11px] text-gray-500 md:text-xs">
-                Values support decimals for exact amounts.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ...existing code... (Report, Table, Modal) */}
       {(isAdmin || isViewer || isDataAgent) && (
         <>
           <div className="max-w-7xl mx-auto w-full mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -657,72 +570,193 @@ export default function DailyDamages() {
                 Track egg damages per outlet and date.
               </p>
             </div>
+            <button
+              onClick={downloadExcel}
+              className="inline-flex items-center rounded-full bg-[#ff7518] px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90"
+            >
+              Download Excel
+            </button>
           </div>
-          {/* Download Report */}
-          <div className="bg-white p-6 rounded-xl shadow mb-8">
-            <h2 className="text-xl font-semibold mb-4">Download Report</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div className="relative z-30" ref={fromCalendarRef}>
-                <label className="block text-sm text-gray-600 mb-1">
-                  From Date
+          {/* Entry Section - moved to top */}
+          {(isAdmin || isDataAgent) && (
+            <div className="mb-8 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100">
+                  <DamageEntryIcon className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900 md:text-lg">
+                    Daily Damages Entry
+                  </h2>
+                  <p className="text-xs text-gray-500 md:text-sm">
+                    Add new egg damage amounts for each outlet.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-5">
+                {/* Select Date */}
+                <div className="grid gap-4 md:grid-cols-[160px,1fr] md:items-center">
+                  <label className="text-xs font-medium text-gray-700 md:text-sm">
+                    Select Date
+                  </label>
+                  <div className="relative w-full" ref={entryCalendarRef}>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsEntryCalendarOpen((open) => !open)}
+                        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
+                      >
+                        <span>
+                          {entryDate ? formatDateDMY(entryDate) : "dd-mm-yyyy"}
+                        </span>
+                        <CalendarIcon className="h-4 w-4 text-gray-500" />
+                      </button>
+                    </div>
+                    {hasEntry && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <div className="text-xs font-medium text-green-700">
+                          Entry ({entryTotal}) • Locked
+                        </div>
+                      </div>
+                    )}
+                    {isEntryCalendarOpen && (
+                      <div className="absolute right-0 bottom-full z-50 mb-2">
+                        <BaseCalendar
+                          rows={damages}
+                          selectedDate={entryDate}
+                          onSelectDate={handleEntryDateSelect}
+                          showDots={true}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Outlet inputs */}
+                <div className="grid gap-3 md:grid-cols-5">
+                  {outlets.map((outlet) => (
+                    <div key={outlet} className="space-y-1">
+                      <p className="text-xs font-medium text-gray-600">
+                        {outlet}
+                      </p>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={form[outlet] ?? 0}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              [outlet]: Number(e.target.value),
+                            }))
+                          }
+                          disabled={hasEntry}
+                          className={`w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm ${
+                            hasEntry ? "bg-gray-50 cursor-not-allowed" : ""
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Save button */}
+                <div className="flex flex-col items-center gap-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={hasEntry}
+                    className={`inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md ${
+                      hasEntry
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-orange-500 hover:bg-orange-600"
+                    }`}
+                  >
+                    {hasEntry ? "Locked" : "Save Entry"}
+                  </button>
+                  <p className="text-center text-[11px] text-gray-500 md:text-xs">
+                    Values support decimals for exact amounts.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ...existing code... (Report, Table, Modal) */}
+          <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs md:text-sm font-medium text-gray-700">
+                  Date From
                 </label>
-                <div className="relative">
+                <div className="relative z-30" ref={fromCalendarRef}>
                   <button
                     type="button"
                     onClick={() => setIsFromCalendarOpen((o) => !o)}
-                    className="w-full rounded-lg border border-gray-200 bg-eggBg px-4 py-2 pr-10 text-left text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="flex min-w-[150px] items-center justify-between rounded-xl border border-gray-200 bg-eggWhite px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
                   >
-                    {fromDate ? formatDateDMY(fromDate) : "dd-mm-yyyy"}
+                    <span>
+                      {fromDate ? formatDateDMY(fromDate) : "dd-mm-yyyy"}
+                    </span>
+                    <CalendarIcon className="h-4 w-4 text-gray-500" />
                   </button>
-                  <CalendarIcon className="h-5 w-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {isFromCalendarOpen && (
+                    <div className="absolute left-0 top-full mt-2 z-50">
+                      <BaseCalendar
+                        rows={damages}
+                        selectedDate={fromDate}
+                        onSelectDate={(iso) => {
+                          setFromDate(iso);
+                          setIsFromCalendarOpen(false);
+                        }}
+                        showDots={false}
+                      />
+                    </div>
+                  )}
                 </div>
-                {isFromCalendarOpen && (
-                  <div className="absolute left-0 top-full mt-2 z-50">
-                    <BaseCalendar
-                      rows={damages}
-                      selectedDate={fromDate}
-                      onSelectDate={(iso) => {
-                        setFromDate(iso);
-                        setIsFromCalendarOpen(false);
-                      }}
-                      showDots={false}
-                    />
-                  </div>
-                )}
               </div>
-              <div className="relative z-30" ref={toCalendarRef}>
-                <label className="block text-sm text-gray-600 mb-1">
-                  To Date
+              <div className="flex items-center gap-2">
+                <label className="text-xs md:text-sm font-medium text-gray-700">
+                  Date To
                 </label>
-                <div className="relative">
+                <div className="relative z-30" ref={toCalendarRef}>
                   <button
                     type="button"
                     onClick={() => setIsToCalendarOpen((o) => !o)}
-                    className="w-full rounded-lg border border-gray-200 bg-eggBg px-4 py-2 pr-10 text-left text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="flex min-w-[150px] items-center justify-between rounded-xl border border-gray-200 bg-eggWhite px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
                   >
-                    {toDate ? formatDateDMY(toDate) : "dd-mm-yyyy"}
+                    <span>
+                      {toDate ? formatDateDMY(toDate) : "dd-mm-yyyy"}
+                    </span>
+                    <CalendarIcon className="h-4 w-4 text-gray-500" />
                   </button>
-                  <CalendarIcon className="h-5 w-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  {isToCalendarOpen && (
+                    <div className="absolute left-0 top-full mt-2 z-50">
+                      <BaseCalendar
+                        rows={damages}
+                        selectedDate={toDate}
+                        onSelectDate={(iso) => {
+                          setToDate(iso);
+                          setIsToCalendarOpen(false);
+                        }}
+                        showDots={false}
+                      />
+                    </div>
+                  )}
                 </div>
-                {isToCalendarOpen && (
-                  <div className="absolute left-0 top-full mt-2 z-50">
-                    <BaseCalendar
-                      rows={damages}
-                      selectedDate={toDate}
-                      onSelectDate={(iso) => {
-                        setToDate(iso);
-                        setIsToCalendarOpen(false);
-                      }}
-                      showDots={false}
-                    />
-                  </div>
-                )}
               </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
-                onClick={downloadExcel}
-                className="mt-4 sm:mt-0 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-6 rounded-lg shadow"
+                type="button"
+                onClick={() => handleQuickRange("lastWeek")}
+                className="rounded-full border border-gray-200 bg-eggWhite px-4 py-2 text-xs md:text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
               >
-                Download Excel
+                Last Week
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickRange("lastMonth")}
+                className="rounded-full border border-gray-200 bg-eggWhite px-4 py-2 text-xs md:text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                Last Month
               </button>
             </div>
           </div>
