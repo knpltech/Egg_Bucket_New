@@ -618,14 +618,146 @@ export default function CashPayments() {
 
         <div className="flex flex-wrap gap-3">
           <button
-  onClick={downloadExcel}
-  className="inline-flex items-center rounded-full bg-[#ff7518] px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90"
->
-  Export Report
-</button>
-
+            onClick={downloadExcel}
+            className="inline-flex items-center rounded-full bg-[#ff7518] px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90"
+          >
+            Export Report
+          </button>
         </div>
       </div>
+
+      {/* Entry Card - NOW FIRST */}
+      {(isAdmin || isDataAgent) && (
+      <div className="mb-6 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-lg text-orange-500">
+            ₹
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 md:text-lg">
+              Cash Payment Entry
+            </h2>
+            <p className="text-xs text-gray-500 md:text-sm">
+              Enter cash amounts collected for today.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveEntry} className="space-y-5">
+          {/* Collection date with custom calendar */}
+          <div className="grid gap-4 md:grid-cols-[160px,1fr] md:items-center">
+            <label className="text-xs font-medium text-gray-700 md:text-sm">
+              Collection Date
+            </label>
+            <div className="relative w-full">
+              <button
+                type="button"
+                onClick={() =>
+                  setIsCalendarOpen((open) => !open)
+                }
+                className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
+              >
+                <span>
+                  {entryDate
+                    ? formatDisplayDate(entryDate)
+                    : "Select date"}
+                </span>
+                <CalendarIcon className="h-4 w-4 text-gray-500" />
+              </button>
+
+              {hasEntry && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <div className="text-xs font-medium text-green-700">
+                    Entry (
+                    {formatCurrencyNoDecimals(
+                      entryTotal && entryTotal > 0
+                        ? entryTotal
+                        : Object.values(entryValues || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
+                    )}
+                    ) • Locked
+                  </div>
+                </div>
+              )}
+
+              {isCalendarOpen && (
+                <div className="absolute right-0 bottom-full z-20 mb-2">
+                  <CashCalendar
+                    rows={rows}
+                    selectedDate={entryDate}
+                    onSelectDate={(iso) => {
+                      setEntryDate(iso);
+                      // Auto-load existing entry data if it exists
+                      const existingEntry = rows.find((row) => row.date === iso);
+                      if (existingEntry) {
+                        setEntryValues(existingEntry.outlets);
+                      } else {
+                        setEntryValues(() => {
+                          const reset = {};
+                          outlets.forEach((o) => {
+                            const area = o.area || o;
+                            reset[area] = "";
+                          });
+                          return reset;
+                        });
+                      }
+                      setIsCalendarOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Amounts per outlet */}
+          <div className="grid gap-3 md:grid-cols-5">
+            {outlets.map((outlet) => {
+              const area = outlet.area || outlet;
+              const isActive = !outlet.status || outlet.status === "Active";
+              return (
+                <div key={area} className="space-y-1">
+                  <p className="text-xs font-medium text-gray-600">
+                    {area.toUpperCase()}
+                    {!isActive && <span className="text-red-500 ml-1">(Inactive)</span>}
+                  </p>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={entryValues[area] || ""}
+                      onChange={(e) =>
+                        handleEntryChange(area, e.target.value)
+                      }
+                      disabled={hasEntry || !isActive}
+                      className={`w-full rounded-xl border border-gray-200 bg-eggBg pl-7 pr-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm ${(hasEntry || !isActive) ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Centered button + note below */}
+          <div className="flex flex-col items-center gap-2 pt-4">
+            <button
+              type="submit"
+              disabled={hasEntry}
+              className={`inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md ${hasEntry ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'}`}
+            >
+              {hasEntry ? 'Locked' : 'Save Entry'}
+            </button>
+            <p className="text-center text-[11px] text-gray-500 md:text-xs">
+              Note: Cash values must be whole numbers only. No decimals
+              allowed.
+            </p>
+          </div>
+        </form>
+      </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -778,140 +910,6 @@ export default function CashPayments() {
       )}
       </>
       )}
-
-      {/* Entry Card */}
-      {(isAdmin || isDataAgent) && (
-      <div className="mt-8 rounded-2xl bg-eggWhite p-5 shadow-sm md:p-6">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-lg text-orange-500">
-            ₹
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-gray-900 md:text-lg">
-              Cash Payment Entry
-            </h2>
-            <p className="text-xs text-gray-500 md:text-sm">
-              Enter cash amounts collected for today.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSaveEntry} className="space-y-5">
-          {/* Collection date with custom calendar */}
-          <div className="grid gap-4 md:grid-cols-[160px,1fr] md:items-center">
-            <label className="text-xs font-medium text-gray-700 md:text-sm">
-              Collection Date
-            </label>
-            <div className="relative w-full">
-              <button
-                type="button"
-                onClick={() =>
-                  setIsCalendarOpen((open) => !open)
-                }
-                className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm"
-              >
-                <span>
-                  {entryDate
-                    ? formatDisplayDate(entryDate)
-                    : "Select date"}
-                </span>
-                <CalendarIcon className="h-4 w-4 text-gray-500" />
-              </button>
-
-              {hasEntry && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <div className="text-xs font-medium text-green-700">
-                    Entry (
-                    {formatCurrencyNoDecimals(
-                      entryTotal && entryTotal > 0
-                        ? entryTotal
-                        : Object.values(entryValues || {}).reduce((sum, v) => sum + (Number(v) || 0), 0)
-                    )}
-                    ) • Locked
-                  </div>
-                </div>
-              )}
-
-              {isCalendarOpen && (
-                <div className="absolute right-0 bottom-full z-20 mb-2">
-                  <CashCalendar
-                    rows={rows}
-                    selectedDate={entryDate}
-                    onSelectDate={(iso) => {
-                      setEntryDate(iso);
-                      // Auto-load existing entry data if it exists
-                      const existingEntry = rows.find((row) => row.date === iso);
-                      if (existingEntry) {
-                        setEntryValues(existingEntry.outlets);
-                      } else {
-                        setEntryValues(() => {
-                          const reset = {};
-                          outlets.forEach((o) => {
-                            const area = o.area || o;
-                            reset[area] = "";
-                          });
-                          return reset;
-                        });
-                      }
-                      setIsCalendarOpen(false);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Amounts per outlet */}
-          <div className="grid gap-3 md:grid-cols-5">
-            {outlets.map((outlet) => {
-              const area = outlet.area || outlet;
-              const isActive = !outlet.status || outlet.status === "Active";
-              return (
-                <div key={area} className="space-y-1">
-                  <p className="text-xs font-medium text-gray-600">
-                    {area.toUpperCase()}
-                    {!isActive && <span className="text-red-500 ml-1">(Inactive)</span>}
-                  </p>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={entryValues[area] || ""}
-                      onChange={(e) =>
-                        handleEntryChange(area, e.target.value)
-                      }
-                      disabled={hasEntry || !isActive}
-                      className={`w-full rounded-xl border border-gray-200 bg-eggBg pl-7 pr-3 py-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400 md:text-sm ${(hasEntry || !isActive) ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Centered button + note below */}
-          <div className="flex flex-col items-center gap-2 pt-4">
-            <button
-              type="submit"
-              disabled={hasEntry}
-              className={`inline-flex items-center justify-center rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-md ${hasEntry ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'}`}
-            >
-              {hasEntry ? 'Locked' : 'Save Entry'}
-            </button>
-            <p className="text-center text-[11px] text-gray-500 md:text-xs">
-              Note: Cash values must be whole numbers only. No decimals
-              allowed.
-            </p>
-          </div>
-        </form>
-      </div>
-      )}
     </div>
-
   );
-  }
+}

@@ -541,6 +541,7 @@ export default function DailyDamages() {
   };
 
   return (
+    
     <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex flex-col">
       {/* Entry Section - moved to top */}
       {(isAdmin || isDataAgent) && (
