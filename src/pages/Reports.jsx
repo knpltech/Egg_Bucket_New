@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell 
@@ -17,11 +17,30 @@ const Reports = () => {
   const [outletsLoading, setOutletsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dateRange, setDateRange] = useState({
-    from: null,
-    to: null
+    from: '',
+    to: ''
   });
   const [showFromCalendar, setShowFromCalendar] = useState(false);
   const [showToCalendar, setShowToCalendar] = useState(false);
+
+  // Refs for click outside
+  const fromCalendarRef = useRef(null);
+  const toCalendarRef = useRef(null);
+
+  // Click outside handlers
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (fromCalendarRef.current && !fromCalendarRef.current.contains(event.target)) {
+        setShowFromCalendar(false);
+      }
+      if (toCalendarRef.current && !toCalendarRef.current.contains(event.target)) {
+        setShowToCalendar(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Load outlets only once on mount
   useEffect(() => {
@@ -66,6 +85,15 @@ const Reports = () => {
         if (dateRange.to) filters.dateTo = dateRange.to;
 
         const data = await fetchReportsData(selectedOutlet, filters);
+        
+        // If no filters applied, ensure we show at least 7 entries
+        if (!dateRange.from && !dateRange.to && data && data.transactions) {
+          const sorted = [...data.transactions].sort((a, b) => 
+            new Date(a.date) - new Date(b.date)
+          );
+          data.transactions = sorted.slice(-7);
+        }
+        
         setReportData(data);
       } catch (err) {
         console.error('Failed to fetch report data:', err);
@@ -90,8 +118,7 @@ const Reports = () => {
       d.setDate(d.getDate() - 7);
       fromDate = d.toISOString().slice(0, 10);
     } else if (type === 'lastMonth') {
-      const d = new Date(today);
-      d.setMonth(d.getMonth() - 1);
+      const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       fromDate = d.toISOString().slice(0, 10);
     }
 
@@ -101,7 +128,7 @@ const Reports = () => {
     });
   };
 
-  // Handle export (Excel only - no additional dependencies needed)
+  // Handle export
   const handleExport = async () => {
     try {
       if (!reportData || !reportData.transactions || reportData.transactions.length === 0) {
@@ -109,15 +136,12 @@ const Reports = () => {
         return;
       }
 
-      // Dynamic import of xlsx
       const XLSX = await import('xlsx');
       
-      // Calculate average closing balance
       const avgClosingBalance = reportData.transactions.length > 0
         ? reportData.transactions.reduce((sum, t) => sum + t.difference, 0) / reportData.transactions.length
         : 0;
       
-      // Prepare summary data
       const summaryData = [
         { Field: 'Outlet', Value: selectedOutlet },
         { Field: 'Date From', Value: dateRange.from || 'All' },
@@ -130,7 +154,6 @@ const Reports = () => {
         { Field: '', Value: '' }
       ];
       
-      // Prepare transactions data
       const transactionsData = reportData.transactions.map(t => ({
         Date: t.date,
         'Sales Qty': t.salesQty,
@@ -142,18 +165,11 @@ const Reports = () => {
         'Closing Balance': `₹${t.difference.toLocaleString()}`
       }));
       
-      // Create workbook
       const wb = XLSX.utils.book_new();
-      
-      // Create summary sheet
       const wsSummary = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-      
-      // Create transactions sheet
       const wsTransactions = XLSX.utils.json_to_sheet(transactionsData);
       XLSX.utils.book_append_sheet(wb, wsTransactions, 'Transactions');
-      
-      // Save file
       XLSX.writeFile(wb, `reports_${selectedOutlet}_${new Date().toISOString().slice(0, 10)}.xlsx`);
       
     } catch (err) {
@@ -255,231 +271,6 @@ const Reports = () => {
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
         }
 
-        .stat-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 20px;
-        }
-
-        .table-container {
-          background: #fefdfb;
-          border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          overflow: hidden;
-          border: 1px solid #f0ebe0;
-        }
-
-        .table-row {
-          transition: background-color 0.15s ease;
-        }
-
-        .table-row:hover {
-          background-color: #faf8f3;
-        }
-
-        .chart-container {
-          background: white;
-          border-radius: 16px;
-          padding: 24px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          border: 1px solid #f0ebe0;
-        }
-
-        .select-custom {
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 6px;
-          padding: 11px 16px;
-          padding-right: 40px;
-          font-size: 14px;
-          font-weight: 400;
-          color: #3c3c3c;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 14px center;
-        }
-
-        .select-custom:hover {
-          border-color: #ff7518;
-          background-color: #fffbf5;
-        }
-
-        .select-custom:focus {
-          outline: none;
-          border-color: #ff7518;
-          background-color: white;
-        }
-
-        .btn-quick {
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 6px;
-          padding: 10px 18px;
-          font-size: 13px;
-          font-weight: 400;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          color: #3c3c3c;
-        }
-
-        .btn-quick:hover {
-          background: #fffbf5;
-          border-color: #ff7518;
-        }
-
-        .btn-export {
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 6px;
-          padding: 10px 20px;
-          font-size: 14px;
-          font-weight: 400;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          color: #3c3c3c;
-        }
-
-        .btn-export:hover {
-          background: #ff7518;
-          color: white;
-          border-color: #ff7518;
-        }
-
-        .date-input {
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 6px;
-          padding: 10px 40px 10px 14px;
-          font-size: 13px;
-          transition: all 0.15s ease;
-          color: #3c3c3c;
-          cursor: pointer;
-          position: relative;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 12px center;
-          background-size: 16px;
-        }
-
-        .date-input:hover {
-          border-color: #ff7518;
-          background-color: #fffbf5;
-        }
-
-        .date-input:focus {
-          outline: none;
-          border-color: #ff7518;
-          background-color: white;
-        }
-
-        .calendar-popup {
-          position: absolute;
-          top: calc(100% + 8px);
-          left: 0;
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 10px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          padding: 12px;
-          z-index: 1000;
-          min-width: 260px;
-        }
-
-        .calendar-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .calendar-nav-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 4px;
-          transition: all 0.15s ease;
-          color: #666;
-          font-size: 18px;
-        }
-
-        .calendar-nav-btn:hover {
-          background: #f5f5f5;
-          color: #ff7518;
-        }
-
-        .calendar-select {
-          background: white;
-          border: 1px solid #d4cec0;
-          border-radius: 4px;
-          padding: 4px 8px;
-          font-size: 12px;
-          cursor: pointer;
-        }
-
-        .calendar-weekdays {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 2px;
-          margin-bottom: 4px;
-        }
-
-        .calendar-weekday {
-          text-align: center;
-          font-size: 10px;
-          font-weight: 600;
-          color: #666;
-          padding: 4px 0;
-        }
-
-        .calendar-days {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 2px;
-        }
-
-        .calendar-day {
-          aspect-ratio: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          cursor: pointer;
-          font-size: 12px;
-          transition: all 0.15s ease;
-          color: #333;
-          width: 32px;
-          height: 32px;
-        }
-
-        .calendar-day:hover {
-          background: #fffbf5;
-          color: #ff7518;
-        }
-
-        .calendar-day.today {
-          border: 2px solid #4ade80;
-          color: #4ade80;
-          font-weight: 600;
-        }
-
-        .calendar-day.selected {
-          background: #ff7518;
-          color: white;
-          font-weight: 600;
-        }
-
-        .calendar-day.other-month {
-          color: #ccc;
-        }
-
         .error-banner {
           background: #fff4e6;
           border: 1px solid #ffe0b2;
@@ -495,17 +286,8 @@ const Reports = () => {
             padding: 16px;
           }
 
-          .chart-container {
-            padding: 16px;
-          }
-
           table {
             font-size: 13px;
-          }
-
-          .calendar-popup {
-            min-width: 280px;
-            padding: 16px;
           }
         }
       `}</style>
@@ -553,7 +335,7 @@ const Reports = () => {
               {/* Date From */}
               <div className="flex items-center gap-2">
                 <label className="text-xs md:text-sm font-medium text-gray-700">Date From</label>
-                <div className="relative">
+                <div className="relative z-30" ref={fromCalendarRef}>
                   <button
                     type="button"
                     onClick={() => {
@@ -584,7 +366,7 @@ const Reports = () => {
                     </svg>
                   </button>
                   {showFromCalendar && (
-                    <div className="absolute left-0 top-full z-30 mt-2">
+                    <div className="absolute left-0 top-full z-50 mt-2">
                       <CalendarPicker
                         selectedDate={dateRange.from}
                         onSelectDate={(date) => handleDateSelect(date, 'from')}
@@ -598,7 +380,7 @@ const Reports = () => {
               {/* Date To */}
               <div className="flex items-center gap-2">
                 <label className="text-xs md:text-sm font-medium text-gray-700">Date To</label>
-                <div className="relative">
+                <div className="relative z-30" ref={toCalendarRef}>
                   <button
                     type="button"
                     onClick={() => {
@@ -629,7 +411,7 @@ const Reports = () => {
                     </svg>
                   </button>
                   {showToCalendar && (
-                    <div className="absolute left-0 top-full z-30 mt-2">
+                    <div className="absolute left-0 top-full z-50 mt-2">
                       <CalendarPicker
                         selectedDate={dateRange.to}
                         onSelectDate={(date) => handleDateSelect(date, 'to')}
@@ -833,23 +615,13 @@ const Reports = () => {
   );
 };
 
-// Calendar Picker Component - Matching Digital Payments style
+// Calendar Picker Component
 const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
-const CalendarPicker = ({ selectedDate, onSelectDate, onClose }) => {
+const CalendarPicker = ({ selectedDate, onSelectDate }) => {
   const today = new Date();
   const initialDate = selectedDate ? new Date(selectedDate) : today;
 
@@ -869,10 +641,7 @@ const CalendarPicker = ({ selectedDate, onSelectDate, onClose }) => {
   const firstDay = new Date(viewYear, viewMonth, 1).getDay();
 
   const buildIso = (year, month, day) =>
-    `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
-      2,
-      "0"
-    )}`;
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   const weeks = [];
   let day = 1 - firstDay;
@@ -916,21 +685,8 @@ const CalendarPicker = ({ selectedDate, onSelectDate, onClose }) => {
 
   const selectedIso = selectedDate || "";
 
-  // Close calendar when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.calendar-popup') && !e.target.closest('.date-input')) {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
   return (
     <div className="w-72 rounded-2xl border border-gray-100 bg-white shadow-xl">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <button
           type="button"
@@ -975,18 +731,11 @@ const CalendarPicker = ({ selectedDate, onSelectDate, onClose }) => {
         </button>
       </div>
 
-      {/* Week days */}
       <div className="mt-1 grid grid-cols-7 gap-y-1 px-4 text-center text-[11px] font-medium text-gray-400">
-        <span>Su</span>
-        <span>Mo</span>
-        <span>Tu</span>
-        <span>We</span>
-        <span>Th</span>
-        <span>Fr</span>
-        <span>Sa</span>
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+        <span>Th</span><span>Fr</span><span>Sa</span>
       </div>
 
-      {/* Days */}
       <div className="mt-1 grid grid-cols-7 gap-y-1 px-3 pb-3 text-center text-xs">
         {weeks.map((week, wIdx) =>
           week.map((d, idx) => {
@@ -1003,9 +752,7 @@ const CalendarPicker = ({ selectedDate, onSelectDate, onClose }) => {
               <button
                 key={`${wIdx}-${idx}`}
                 type="button"
-                onClick={() => {
-                  onSelectDate(new Date(viewYear, viewMonth, d));
-                }}
+                onClick={() => onSelectDate(new Date(viewYear, viewMonth, d))}
                 className="flex h-8 items-center justify-center"
               >
                 <div
