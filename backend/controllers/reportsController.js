@@ -98,12 +98,14 @@ export const getReports = async (req, res) => {
 
     console.log('📊 Fetching reports for outlet:', outletId);
 
-    // Fetch all collections in parallel
-    const [salesSnapshot, digitalPaymentsSnapshot, cashPaymentsSnapshot, neccRateSnapshot] = await Promise.all([
+
+    // Fetch all collections in parallel, including dailyDamages
+    const [salesSnapshot, digitalPaymentsSnapshot, cashPaymentsSnapshot, neccRateSnapshot, dailyDamagesSnapshot] = await Promise.all([
       db.collection('dailySales').limit(100).get(),
       db.collection('digitalPayments').limit(100).get(),
       db.collection('cashPayments').limit(100).get(),
-      db.collection('neccRate').limit(100).get()
+      db.collection('neccRate').limit(100).get(),
+      db.collection('dailyDamages').limit(100).get()
     ]);
 
     const fetchTime = Date.now() - startTime;
@@ -197,6 +199,29 @@ export const getReports = async (req, res) => {
       }
     });
 
+
+    // Add damages from dailyDamages collection
+    dailyDamagesSnapshot.forEach(doc => {
+      const data = doc.data();
+      const dateKey = formatDate(data.date || data.createdAt);
+      if (data.damages && data.damages[outletId] !== undefined) {
+        if (!dateMap[dateKey]) {
+          dateMap[dateKey] = {
+            date: dateKey,
+            salesQty: 0,
+            neccRate: 0,
+            totalAmount: 0,
+            digitalPay: 0,
+            cashPay: 0,
+            totalRecv: 0,
+            difference: 0,
+            damages: 0
+          };
+        }
+        dateMap[dateKey].damages = parseFloat(data.damages[outletId] || 0);
+      }
+    });
+
     // Convert to array and calculate
     let transactions = Object.values(dateMap).map(t => {
       // If no NECC rate per outlet, try to calculate from total/quantity
@@ -206,10 +231,10 @@ export const getReports = async (req, res) => {
           t.neccRate = parseFloat((totalReceived / t.salesQty).toFixed(2));
         }
       }
-      
       t.totalAmount = parseFloat((t.salesQty * t.neccRate).toFixed(2));
       t.totalRecv = parseFloat((t.digitalPay + t.cashPay).toFixed(2));
       t.difference = parseFloat((t.totalRecv - t.totalAmount).toFixed(2));
+      t.damages = t.damages || 0;
       return t;
     });
 
@@ -226,6 +251,7 @@ export const getReports = async (req, res) => {
       });
     }
 
+
     // Calculate summary
     const totalSalesQuantity = transactions.reduce((sum, t) => sum + (t.salesQty || 0), 0);
     const averageNeccRate = transactions.length > 0 
@@ -233,6 +259,7 @@ export const getReports = async (req, res) => {
       : 0;
     const totalAmount = transactions.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const totalDifference = transactions.reduce((sum, t) => sum + (t.difference || 0), 0);
+    const totalDamages = transactions.reduce((sum, t) => sum + (t.damages || 0), 0);
 
     console.log(`✅ Processed in ${Date.now() - startTime}ms - ${transactions.length} transactions`);
 
@@ -243,11 +270,12 @@ export const getReports = async (req, res) => {
       averageNeccRate: parseFloat(averageNeccRate.toFixed(2)),
       totalAmount: parseFloat(totalAmount.toFixed(2)),
       totalDifference: parseFloat(totalDifference.toFixed(2)),
+      totalDamages: parseFloat(totalDamages.toFixed(2)),
       transactions,
       _performance: {
         fetchTimeMs: fetchTime,
         totalTimeMs: Date.now() - startTime,
-        recordsProcessed: salesSnapshot.size + digitalPaymentsSnapshot.size + cashPaymentsSnapshot.size + neccRateSnapshot.size,
+        recordsProcessed: salesSnapshot.size + digitalPaymentsSnapshot.size + cashPaymentsSnapshot.size + neccRateSnapshot.size + dailyDamagesSnapshot.size,
         transactionsProcessed: transactions.length
       }
     });

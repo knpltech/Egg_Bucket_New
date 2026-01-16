@@ -154,7 +154,7 @@ const Reports = () => {
         { Field: 'Total Sales Quantity', Value: `${reportData.totalSalesQuantity || 0} eggs` },
         { Field: 'Average Closing Balance', Value: `₹${Math.round(avgClosingBalance)}` },
         { Field: 'Total Amount', Value: `₹${reportData.totalAmount?.toLocaleString() || '0'}` },
-        { Field: 'Total Damages', Value: `${Math.round(Math.abs(reportData.totalDifference || 0))}` },
+        { Field: 'Total Damages', Value: `${Math.round(Math.abs(reportData.totalDamages || 0))}` },
         { Field: '', Value: '' }
       ];
       
@@ -533,10 +533,10 @@ const Reports = () => {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className={`text-3xl font-bold ${
-                    reportData.totalDifference < 0 ? 'text-red-600' : 
-                    reportData.totalDifference > 0 ? 'text-green-600' : 'text-gray-900'
+                    reportData.totalDamages < 0 ? 'text-red-600' : 
+                    reportData.totalDamages > 0 ? 'text-green-600' : 'text-gray-900'
                   }`}>
-                    {Math.round(Math.abs(reportData.totalDifference || 0)).toLocaleString()}
+                    {Math.round(Math.abs(reportData.totalDamages || 0)).toLocaleString()}
                   </span>
                 </div>
               </div>
