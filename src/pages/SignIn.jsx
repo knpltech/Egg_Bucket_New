@@ -158,7 +158,6 @@ export default function SignIn() {
             className="w-full p-3 rounded-xl bg-eggInput outline-none shadow"
           >
             <option value="admin">Admin</option>
-            <option value="dataagent">Data Agent</option>
               <option value="viewer">Viewer</option>
           </select>
 

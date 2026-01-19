@@ -1,3 +1,16 @@
+// Delete an outlet by ID
+export const deleteOutlet = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, error: "Missing outlet ID" });
+    }
+    await db.collection("outlets").doc(id).delete();
+    return res.json({ success: true, message: "Outlet deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
 import { db } from "../config/firebase.js";
 
 // Add a new outlet

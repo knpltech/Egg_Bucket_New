@@ -148,23 +148,69 @@ const REQUIRED_AREAS = [
 ];
 
 export default function Outlets() {
-  const [outlets, setOutlets] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : SAMPLE_OUTLETS;
-  });
+
+  const [outlets, setOutlets] = useState([]);
+
+  // Fetch latest outlets from backend on mount and when page becomes visible
+  useEffect(() => {
+    const fetchOutlets = async () => {
+      try {
+        const res = await fetch(`${API_URL}/outlets/all`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setOutlets(data);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          }
+        }
+      } catch {
+        // fallback to localStorage or sample if offline
+        const saved = localStorage.getItem(STORAGE_KEY);
+        let initial = saved ? JSON.parse(saved) : SAMPLE_OUTLETS;
+        // Remove duplicates by ID
+        const seen = new Set();
+        initial = initial.filter((o) => {
+          if (seen.has(o.id)) return false;
+          seen.add(o.id);
+          return true;
+        });
+        setOutlets(initial);
+      }
+    };
+    fetchOutlets();
+    // Listen for page visibility change (tab switch)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchOutlets();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   // On first mount, store all outlets in the database if not already present
   useEffect(() => {
     async function syncToBackend() {
+      // Get existing IDs from backend
+      let existingIds = new Set();
+      try {
+        const res = await fetch(`${API_URL}/outlets/all`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            data.forEach((o) => existingIds.add(o.id));
+          }
+        }
+      } catch {}
       for (const outlet of outlets) {
-        try {
-          await fetch(`${API_URL}/outlets/add`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(outlet),
-          });
-        } catch (err) {
-          // ignore network errors for now
+        if (!existingIds.has(outlet.id)) {
+          try {
+            await fetch(`${API_URL}/outlets/add`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(outlet),
+            });
+          } catch (err) {
+            // ignore network errors for now
+          }
         }
       }
     }
@@ -189,9 +235,19 @@ export default function Outlets() {
       const missing = REQUIRED_AREAS.filter((r) => !areas.includes(r));
       if (missing.length === 0) return prev;
 
-      const nextNumberStart = prev.length + 1;
-      const added = missing.map((area, idx) => ({
-        id: `OUT-${String(nextNumberStart + idx).padStart(3, "0")}`,
+      // Find the next available unique OUT-XXX number
+      const existingIds = new Set(prev.map((o) => o.id));
+      let nextNum = 1;
+      const getNextId = () => {
+        while (existingIds.has(`OUT-${String(nextNum).padStart(3, "0")}`)) {
+          nextNum++;
+        }
+        const id = `OUT-${String(nextNum).padStart(3, "0")}`;
+        existingIds.add(id);
+        return id;
+      };
+      const added = missing.map((area) => ({
+        id: getNextId(),
         name: `${area} Outlet`,
         area,
         contact: "-",
@@ -199,7 +255,6 @@ export default function Outlets() {
         status: "Active",
         reviewStatus: "ok",
       }));
-
       return [...added, ...prev];
     });
   }, []);
@@ -328,6 +383,8 @@ const handleDeleteOutlet = async (id) => {
 
     if (isEditMode && editingId) {
       // Edit existing outlet
+      // Find the original outlet to preserve reviewStatus
+      const original = outlets.find(o => o.id === editingId) || {};
       const updatedOutlet = {
         id: editingId,
         name: newOutlet.name,
@@ -335,6 +392,7 @@ const handleDeleteOutlet = async (id) => {
         contact: newOutlet.contact || "-",
         phone: newOutlet.phone || "-",
         status: newOutlet.status,
+        reviewStatus: original.reviewStatus || "ok"
       };
       try {
         await fetch(`${API_URL}/outlets/add`, {
@@ -342,9 +400,14 @@ const handleDeleteOutlet = async (id) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedOutlet),
         });
-        setOutlets((prev) =>
-          prev.map((o) => (o.id === editingId ? { ...o, ...updatedOutlet } : o))
-        );
+        // Fetch latest outlets from backend to ensure status is correct
+        const res = await fetch(`${API_URL}/outlets/all`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setOutlets(data);
+          }
+        }
       } catch (err) {
         alert("Failed to update outlet in backend.");
       }
@@ -360,8 +423,8 @@ const handleDeleteOutlet = async (id) => {
         area: newOutlet.area,
         contact: newOutlet.contact || "-",
         phone: newOutlet.phone || "-",
-        status: "Inactive",
-        reviewStatus: "pending",
+        status: "Active",
+        reviewStatus: "ok",
       };
       try {
         await fetch(`${API_URL}/outlets/add`, {
@@ -616,49 +679,17 @@ const handleDeleteOutlet = async (id) => {
                         >
                           <button
                             type="button"
-                            onClick={async () => {
-                              try {
-                                await fetch(`${API_URL}/outlets/add`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ ...outlet, status: "Active" }),
-                                });
-                                setOutlets((prev) =>
-                                  prev.map((o) =>
-                                    o.id === outlet.id ? { ...o, status: "Active" } : o
-                                  )
-                                );
-                              } catch (err) {
-                                alert("Failed to update status in backend.");
-                              }
-                              setOpenActionId(null);
-                            }}
+                            onClick={() => handleOpenEditModal(outlet)}
                             className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded-t-lg"
                           >
-                            Active
+                            Edit
                           </button>
                           <button
                             type="button"
-                            onClick={async () => {
-                              try {
-                                await fetch(`${API_URL}/outlets/add`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ ...outlet, status: "Inactive" }),
-                                });
-                                setOutlets((prev) =>
-                                  prev.map((o) =>
-                                    o.id === outlet.id ? { ...o, status: "Inactive" } : o
-                                  )
-                                );
-                              } catch (err) {
-                                alert("Failed to update status in backend.");
-                              }
-                              setOpenActionId(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-red-600 hover:bg-gray-100 rounded-b-lg"
+                            onClick={() => handleDeleteOutlet(outlet.id)}
+                            className="block w-full text-left px-3 py-2 text-white bg-red-600 hover:bg-red-700 rounded-b-lg"
                           >
-                            Inactive
+                            Delete
                           </button>
                         </div>
                       )}

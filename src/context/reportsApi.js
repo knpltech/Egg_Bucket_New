@@ -62,8 +62,8 @@ export const fetchReportsData = async (outletId, filters = {}) => {
  */
 export const fetchOutlets = async () => {
   try {
-    // Changed from /outlets to /reports/outlets
-    const response = await fetch(`${API_BASE_URL}/reports/outlets`, {
+    // Use the same endpoint as Outlets page for real-time sync
+    const response = await fetch(`${API_BASE_URL}/outlets/all`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -75,21 +75,17 @@ export const fetchOutlets = async () => {
     }
 
     const data = await response.json();
-    
-    // Backend returns: { success: true, outlets: [...], totalRecords: {...} }
-    // Return the outlets array
-    return data.outlets || [];
-    
+    // Return the outlets array directly
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error('Error fetching outlets:', error);
-    
-    // Fallback: If the discovery endpoint fails, return demo outlets
-    console.log('Using fallback demo outlets');
+    // Fallback: If the endpoint fails, return demo outlets
     return [
-      { id: '1', name: 'AECS Layout' },
-      { id: '2', name: 'HSR Layout' },
-      { id: '3', name: 'Koramangala' },
-      { id: '4', name: 'Whitefield' }
+      { id: 'OUT-001', name: 'AECS Layout' },
+      { id: 'OUT-002', name: 'Bandepalya' },
+      { id: 'OUT-003', name: 'Hosa Road' },
+      { id: 'OUT-004', name: 'Singasandra' },
+      { id: 'OUT-005', name: 'Kudlu Gate' }
     ];
   }
 };

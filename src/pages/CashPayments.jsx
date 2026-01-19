@@ -2,19 +2,10 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { getRoleFlags } from "../utils/role";
 import * as XLSX from "xlsx";
 import DailyTable from "../components/DailyTable";
+import { fetchOutlets } from '../context/reportsApi';
 
 const API_URL = import.meta.env.VITE_API_URL;
-
-const DEFAULT_OUTLETS = [
-  "AECS Layout",
-  "Bandepalya",
-  "Hosa Road",
-  "Singasandra",
-  "Kudlu Gate",
-];
-
 const STORAGE_KEY = "egg_outlets_v1";
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -198,11 +189,7 @@ export default function CashPayments() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [entryDate, setEntryDate] = useState("");
-  const [entryValues, setEntryValues] = useState(() => {
-    const initial = {};
-    DEFAULT_OUTLETS.forEach((area) => { initial[area] = ""; });
-    return initial;
-  });
+  const [entryValues, setEntryValues] = useState({});
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isCustomFromOpen, setIsCustomFromOpen] = useState(false);
   const [isCustomToOpen, setIsCustomToOpen] = useState(false);
@@ -220,35 +207,17 @@ export default function CashPayments() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load outlets
+  // Fetch outlets from backend for consistent naming
   useEffect(() => {
-    const loadOutletsFromLocal = () => {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const savedOutlets = JSON.parse(saved);
-        setOutlets(Array.isArray(savedOutlets) ? savedOutlets : []);
+    const loadOutlets = async () => {
+      try {
+        const backendOutlets = await fetchOutlets();
+        setOutlets(backendOutlets);
+      } catch {
+        setOutlets([]);
       }
     };
-
-    loadOutletsFromLocal();
-
-    const onUpdate = (e) => {
-      const outletsList = (e?.detail && Array.isArray(e.detail)) ? e.detail : null;
-      if (outletsList) {
-        setOutlets(outletsList);
-      } else {
-        loadOutletsFromLocal();
-      }
-    };
-
-    window.addEventListener('egg:outlets-updated', onUpdate);
-    const onStorage = (evt) => { if (evt.key === STORAGE_KEY) onUpdate(); };
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      window.removeEventListener('egg:outlets-updated', onUpdate);
-      window.removeEventListener('storage', onStorage);
-    };
+    loadOutlets();
   }, []);
 
   // Fetch payments

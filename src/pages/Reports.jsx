@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { fetchReportsData, fetchOutlets, exportReports } from '../context/reportsApi';
+
+// DEBUG: Fetch all outlet names from backend data for troubleshooting
+async function fetchAllOutletNames() {
+  try {
+    const res = await fetch(import.meta.env.VITE_API_BASE_URL + '/outlets/all');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      return data.map(o => o.id || o.name || '').filter(Boolean);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell 
 } from 'recharts';
-import { 
-  fetchReportsData, 
-  fetchOutlets, 
-  exportReports 
-} from '../context/reportsApi';
 
 const Reports = () => {
   const [outlets, setOutlets] = useState([]);
@@ -20,6 +31,8 @@ const Reports = () => {
     from: '',
     to: ''
   });
+  // Debug: all outlet names in backend
+  const [debugOutletNames, setDebugOutletNames] = useState([]);
   const [showFromCalendar, setShowFromCalendar] = useState(false);
   const [showToCalendar, setShowToCalendar] = useState(false);
 
@@ -49,14 +62,11 @@ const Reports = () => {
       try {
         const outletsData = await fetchOutlets();
         setOutlets(outletsData);
-        
         if (outletsData.length > 0) {
           setSelectedOutlet(outletsData[0].id);
         }
       } catch (err) {
-        console.error('Failed to load outlets:', err);
         setError('Failed to load outlets');
-        
         const demoOutlets = [
           { id: 'AECS Layout', name: 'AECS Layout' },
           { id: 'Bandepalya', name: 'Bandepalya' }
@@ -67,8 +77,9 @@ const Reports = () => {
         setOutletsLoading(false);
       }
     };
-
     loadOutlets();
+    // DEBUG: fetch all outlet names in backend
+    fetchAllOutletNames().then(setDebugOutletNames);
   }, []);
 
   // Fetch report data when outlet or date range changes
@@ -327,6 +338,18 @@ const Reports = () => {
       `}</style>
 
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 py-8">
+        {/* DEBUG: Show all outlet names found in backend */}
+        {debugOutletNames.length > 0 && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-900">
+            <strong>Debug: Outlet names in backend data:</strong>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {debugOutletNames.map(name => (
+                <span key={name} className="px-2 py-1 bg-yellow-100 rounded border border-yellow-200">{name}</span>
+              ))}
+            </div>
+            <div className="mt-1 text-yellow-800">Ensure your data entry matches these names exactly for reports to work.</div>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">Reports</h1>
@@ -353,10 +376,7 @@ const Reports = () => {
                 >
                   {outlets
                     .filter(
-                      outlet => !["HSR LAYOUT", "Hsr layout", "kr market"].includes(
-                        (outlet.name || outlet.id || "").toLowerCase()
-                      ) &&
-                      !["hsr layout", "kr market"].includes((outlet.name || outlet.id || "").toLowerCase())
+                      outlet => outlet.status !== 'Inactive'
                     )
                     .map(outlet => (
                       <option key={outlet.id} value={outlet.id}>

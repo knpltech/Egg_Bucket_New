@@ -12,26 +12,34 @@ export default function AdminDashboard() {
   const [damagesThisWeek, setDamagesThisWeek] = useState(0);
 
   useEffect(() => {
-    // Outlets
-    const data = localStorage.getItem("egg_outlets_v1");
-    let outlets = [];
-    if (data) {
-      outlets = JSON.parse(data);
-    }
-    // If no outlets in localStorage, fetch from backend
-    if (!Array.isArray(outlets) || outlets.length === 0) {
-      fetch(`${API_URL}/outlets/all`)
-        .then(res => res.json())
-        .then(list => {
-          const activeOutlets = Array.isArray(list)
-            ? list.filter(o => o.status === "Active").length
-            : 0;
-          setTotalOutlets(activeOutlets);
-        });
-    } else {
-      const activeOutlets = outlets.filter(o => o.status === "Active").length;
-      setTotalOutlets(activeOutlets);
-    }
+    const updateOutlets = () => {
+      const data = localStorage.getItem("egg_outlets_v1");
+      let outlets = [];
+      if (data) {
+        outlets = JSON.parse(data);
+      }
+      // If no outlets in localStorage, fetch from backend
+      if (!Array.isArray(outlets) || outlets.length === 0) {
+        fetch(`${API_URL}/outlets/all`)
+          .then(res => res.json())
+          .then(list => {
+            const activeOutlets = Array.isArray(list)
+              ? list.filter(o => o.status === "Active").length
+              : 0;
+            setTotalOutlets(activeOutlets);
+          });
+      } else {
+        const activeOutlets = outlets.filter(o => o.status === "Active").length;
+        setTotalOutlets(activeOutlets);
+      }
+    };
+    updateOutlets();
+
+    // Listen for outlet updates (real-time sync)
+    const handleOutletsUpdated = () => {
+      updateOutlets();
+    };
+    window.addEventListener('egg:outlets-updated', handleOutletsUpdated);
 
     // Eggs distributed today
     const fetchEggsToday = async () => {
@@ -76,6 +84,10 @@ export default function AdminDashboard() {
       ? damages.find(d => d.date === today)
       : null;
     setDamagesThisWeek(damagesToday && !isNaN(Number(damagesToday.total)) ? Number(damagesToday.total) : 0);
+
+    return () => {
+      window.removeEventListener('egg:outlets-updated', handleOutletsUpdated);
+    };
   }, [damages]);
 
   return (

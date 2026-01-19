@@ -199,15 +199,11 @@ export default function DigitalPayments() {
   const [editRow, setEditRow] = useState({});
   const [editValues, setEditValues] = useState({});
   const [rows, setRows] = useState([]);
-  const [outlets, setOutlets] = useState(DEFAULT_OUTLETS);
+  const [outlets, setOutlets] = useState([]);
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [entryDate, setEntryDate] = useState("");
-  const [entryValues, setEntryValues] = useState(() => {
-    const initial = {};
-    DEFAULT_OUTLETS.forEach((area) => { initial[area] = ""; });
-    return initial;
-  });
+  const [entryValues, setEntryValues] = useState({});
   const [isEntryCalendarOpen, setIsEntryCalendarOpen] = useState(false);
   const [isFilterFromOpen, setIsFilterFromOpen] = useState(false);
   const [isFilterToOpen, setIsFilterToOpen] = useState(false);
