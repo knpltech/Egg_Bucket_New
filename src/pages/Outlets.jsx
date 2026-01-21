@@ -1,54 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL;
-// src/pages/Outlets.jsx
-import { useMemo, useState, useEffect } from "react";
-
-const SAMPLE_OUTLETS = [
-  {
-    id: "OUT-001",
-    name: "Sunrise Bakery",
-    area: "AECS Layout",
-    contact: "Rajesh Kumar",
-    phone: "+91 98765 43210",
-    status: "Active",
-    reviewStatus: "ok",
-  },
-  {
-    id: "OUT-002",
-    name: "City Mart Supermarket",
-    area: "Bandepalya",
-    contact: "Anita Roy",
-    phone: "+91 91234 56789",
-    status: "Active",
-    reviewStatus: "ok",
-  },
-  {
-    id: "OUT-003",
-    name: "Hosa Road Bakers",
-    area: "Hosa Road",
-    contact: "Manish Patel",
-    phone: "+91 99887 66554",
-    status: "Active",
-    reviewStatus: "ok",
-  },
-  {
-    id: "OUT-004",
-    name: "Singasandra Grocers",
-    area: "Singasandra",
-    contact: "Deepa Rao",
-    phone: "+91 88776 55443",
-    status: "Active",
-    reviewStatus: "ok",
-  },
-  {
-    id: "OUT-005",
-    name: "Kudlu Gate Store",
-    area: "Kudlu Gate",
-    contact: "Vijay Kumar",
-    phone: "+91 77665 44332",
-    status: "Active",
-    reviewStatus: "ok",
-  },
-];
+import { useMemo, useState, useEffect, useCallback } from "react";
 
 const AVATAR_COLORS = [
   "bg-blue-100 text-blue-600",
@@ -58,6 +9,16 @@ const AVATAR_COLORS = [
   "bg-pink-100 text-pink-600",
   "bg-teal-100 text-teal-600",
 ];
+
+const REQUIRED_AREAS = [
+  "AECS Layout",
+  "Bandepalya",
+  "Hosa Road",
+  "Singasandra",
+  "Kudlu Gate",
+];
+
+const STORAGE_KEY = "egg_outlets_v1";
 
 function getAvatarInitials(name) {
   if (!name) return "";
@@ -76,7 +37,6 @@ function getStatusBadgeClasses(status) {
   return "bg-orange-50 text-orange-700 border border-orange-200";
 }
 
-/* ---------- Icons ---------- */
 function SearchIcon({ className = "" }) {
   return (
     <svg
@@ -85,22 +45,8 @@ function SearchIcon({ className = "" }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <circle
-        cx="9"
-        cy="9"
-        r="5"
-        stroke="#D5964A"
-        strokeWidth="1.4"
-      />
-      <line
-        x1="12.5"
-        y1="12.5"
-        x2="16"
-        y2="16"
-        stroke="#D5964A"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
+      <circle cx="9" cy="9" r="5" stroke="#D5964A" strokeWidth="1.4" />
+      <line x1="12.5" y1="12.5" x2="16" y2="16" stroke="#D5964A" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -113,129 +59,109 @@ function FilterIcon({ className = "" }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M4 5H16"
-        stroke="#44403C"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6 10H14"
-        stroke="#44403C"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9 15H11"
-        stroke="#44403C"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
+      <path d="M4 5H16" stroke="#44403C" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M6 10H14" stroke="#44403C" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M9 15H11" stroke="#44403C" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
-/* --------------------------- */
-
-const STORAGE_KEY = "egg_outlets_v1";
-
-// The five required layouts used across the app
-const REQUIRED_AREAS = [
-  "AECS Layout",
-  "Bandepalya",
-  "Hosa Road",
-  "Singasandra",
-  "Kudlu Gate",
-];
 
 export default function Outlets() {
-
   const [outlets, setOutlets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch latest outlets from backend on mount and when page becomes visible
-  useEffect(() => {
-    const fetchOutlets = async () => {
-      try {
-        const res = await fetch(`${API_URL}/outlets/all`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setOutlets(data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-          }
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 6;
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newOutlet, setNewOutlet] = useState({
+    name: "",
+    area: "",
+    contact: "",
+    phone: "",
+    status: "Active",
+  });
+  const [openActionId, setOpenActionId] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  /* ================= FETCH OUTLETS ================= */
+  const fetchOutlets = useCallback(async () => {
+    try {
+      console.log('Fetching outlets from backend...');
+      const res = await fetch(`${API_URL}/outlets/all`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          console.log('Outlets loaded from backend:', data.length);
+          setOutlets(data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          setError(null);
+        } else {
+          throw new Error('Empty outlets response');
         }
-      } catch {
-        // fallback to localStorage or sample if offline
-        const saved = localStorage.getItem(STORAGE_KEY);
-        let initial = saved ? JSON.parse(saved) : SAMPLE_OUTLETS;
-        // Remove duplicates by ID
-        const seen = new Set();
-        initial = initial.filter((o) => {
-          if (seen.has(o.id)) return false;
-          seen.add(o.id);
-          return true;
-        });
-        setOutlets(initial);
+      } else {
+        throw new Error(`Backend error: ${res.status}`);
       }
-    };
-    fetchOutlets();
-    // Listen for page visibility change (tab switch)
+    } catch (err) {
+      console.error("Error fetching outlets:", err);
+      
+      // Try localStorage as fallback
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log('Using cached outlets from localStorage');
+            setOutlets(parsed);
+            setError(null);
+            return;
+          }
+        } catch (parseErr) {
+          console.error("Error parsing saved outlets:", parseErr);
+        }
+      }
+      
+      // No data available at all
+      setOutlets([]);
+      setError('Failed to load outlets. Please refresh the page.');
+    }
+  }, []);
+
+  // Load outlets on component mount
+  useEffect(() => {
+    setIsLoading(true);
+    fetchOutlets().finally(() => setIsLoading(false));
+  }, [fetchOutlets]);
+
+  // Listen for visibility change (tab switch)
+  useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") fetchOutlets();
+      if (document.visibilityState === "visible") {
+        console.log('Page visible, reloading outlets');
+        fetchOutlets();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  }, [fetchOutlets]);
 
-  // On first mount, store all outlets in the database if not already present
+  // Ensure required areas exist
   useEffect(() => {
-    async function syncToBackend() {
-      // Get existing IDs from backend
-      let existingIds = new Set();
-      try {
-        const res = await fetch(`${API_URL}/outlets/all`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            data.forEach((o) => existingIds.add(o.id));
-          }
-        }
-      } catch {}
-      for (const outlet of outlets) {
-        if (!existingIds.has(outlet.id)) {
-          try {
-            await fetch(`${API_URL}/outlets/add`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(outlet),
-            });
-          } catch (err) {
-            // ignore network errors for now
-          }
-        }
-      }
-    }
-    syncToBackend();
-  }, []);
+    if (outlets.length === 0) return;
 
-  // Persist to localStorage when outlets change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(outlets));
-    // Dispatch a custom event so other pages in the same tab can update immediately
-    try {
-      window.dispatchEvent(new CustomEvent('egg:outlets-updated', { detail: outlets }));
-    } catch (err) {
-      // ignore
-    }
-  }, [outlets]);
-
-  // Ensure required areas exist as outlets (add missing ones automatically)
-  useEffect(() => {
     setOutlets((prev) => {
-      const areas = prev.map((o) => o.area);
-      const missing = REQUIRED_AREAS.filter((r) => !areas.includes(r));
+      const areas = new Set(prev.map((o) => o.area));
+      const missing = REQUIRED_AREAS.filter((r) => !areas.has(r));
+      
       if (missing.length === 0) return prev;
 
-      // Find the next available unique OUT-XXX number
+      console.log('Adding missing outlets:', missing);
+      
       const existingIds = new Set(prev.map((o) => o.id));
       let nextNum = 1;
       const getNextId = () => {
@@ -246,6 +172,7 @@ export default function Outlets() {
         existingIds.add(id);
         return id;
       };
+
       const added = missing.map((area) => ({
         id: getNextId(),
         name: `${area} Outlet`,
@@ -255,82 +182,55 @@ export default function Outlets() {
         status: "Active",
         reviewStatus: "ok",
       }));
+
+      // Sync missing outlets to backend
+      added.forEach((outlet) => {
+        fetch(`${API_URL}/outlets/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(outlet),
+        }).catch(err => console.error('Failed to sync outlet to backend:', err));
+      });
+
       return [...added, ...prev];
     });
   }, []);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  const [page, setPage] = useState(1);
-  const pageSize = 6;
-
-const [showAddModal, setShowAddModal] = useState(false);
-const [newOutlet, setNewOutlet] = useState({
-  name: "",
-  area: "",
-  contact: "",
-  phone: "",
-  status: "Active",
-});
-const [openActionId, setOpenActionId] = useState(null);
-const [isEditMode, setIsEditMode] = useState(false);
-const [editingId, setEditingId] = useState(null);
-
-// Close action menu when clicking outside of any action menu
-useEffect(() => {
-  const handler = (e) => {
-    // Treat both the menu and the toggle button as "inside" so clicks that open the menu
-    // don't get immediately closed by this handler.
-    if (!e.target.closest("[data-action-menu], [data-action-toggle]")) {
-      setOpenActionId(null);
+  // Persist to localStorage and dispatch event when outlets change
+  useEffect(() => {
+    if (outlets.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(outlets));
+      try {
+        window.dispatchEvent(new CustomEvent('egg:outlets-updated', { detail: outlets }));
+        console.log('Outlets updated event dispatched');
+      } catch (err) {
+        console.error('Failed to dispatch outlets event:', err);
+      }
     }
-  };
-  document.addEventListener("click", handler);
-  return () => document.removeEventListener("click", handler);
-}, []);
+  }, [outlets]);
 
-const handleOpenEditModal = (outlet) => {
-  setNewOutlet({
-    name: outlet.name,
-    area: outlet.area,
-    contact: outlet.contact === "-" ? "" : outlet.contact,
-    phone: outlet.phone === "-" ? "" : outlet.phone,
-    status: outlet.status,
-  });
-  setIsEditMode(true);
-  setEditingId(outlet.id);
-  setShowAddModal(true);
-  setOpenActionId(null);
-};
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest("[data-action-menu], [data-action-toggle]")) {
+        setOpenActionId(null);
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
 
-const handleDeleteOutlet = async (id) => {
-  if (!confirm("Are you sure you want to delete this outlet?")) return;
-  try {
-    await fetch(`${API_URL}/outlets/delete/${id}`, { method: "DELETE" });
-    setOutlets((prev) => prev.filter((o) => o.id !== id));
-  } catch (err) {
-    alert("Failed to delete outlet from backend.");
-  }
-  setOpenActionId(null);
-};
-
-
-
+  /* ================= METRICS ================= */
   const metrics = useMemo(() => {
     const totalOutlets = outlets.length;
     const activeOutlets = outlets.filter((o) => o.status === "Active").length;
-    const pendingReview = outlets.filter(
-      (o) => o.reviewStatus === "pending"
-    ).length;
-
+    const pendingReview = outlets.filter((o) => o.reviewStatus === "pending").length;
     return { totalOutlets, activeOutlets, pendingReview };
   }, [outlets]);
 
+  /* ================= FILTERING ================= */
   const filteredOutlets = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     let list = outlets;
 
     if (query) {
@@ -357,10 +257,10 @@ const handleDeleteOutlet = async (id) => {
     return filteredOutlets.slice(start, start + pageSize);
   }, [filteredOutlets, page]);
 
-  const fromIndex =
-    filteredOutlets.length === 0 ? 0 : (page - 1) * pageSize + 1;
+  const fromIndex = filteredOutlets.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const toIndex = Math.min(page * pageSize, filteredOutlets.length);
 
+  /* ================= HANDLERS ================= */
   const handleOpenAddModal = () => {
     setNewOutlet({
       name: "",
@@ -374,6 +274,36 @@ const handleDeleteOutlet = async (id) => {
     setShowAddModal(true);
   };
 
+  const handleOpenEditModal = (outlet) => {
+    setNewOutlet({
+      name: outlet.name,
+      area: outlet.area,
+      contact: outlet.contact === "-" ? "" : outlet.contact,
+      phone: outlet.phone === "-" ? "" : outlet.phone,
+      status: outlet.status,
+    });
+    setIsEditMode(true);
+    setEditingId(outlet.id);
+    setShowAddModal(true);
+    setOpenActionId(null);
+  };
+
+  const handleDeleteOutlet = async (id) => {
+    if (!confirm("Are you sure you want to delete this outlet?")) return;
+    try {
+      const res = await fetch(`${API_URL}/outlets/delete/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setOutlets((prev) => prev.filter((o) => o.id !== id));
+      } else {
+        alert("Failed to delete outlet from backend.");
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert("Failed to delete outlet.");
+    }
+    setOpenActionId(null);
+  };
+
   const handleSaveNewOutlet = async (e) => {
     e.preventDefault();
     if (!newOutlet.name || !newOutlet.area) {
@@ -381,77 +311,94 @@ const handleDeleteOutlet = async (id) => {
       return;
     }
 
-    if (isEditMode && editingId) {
-      // Edit existing outlet
-      // Find the original outlet to preserve reviewStatus
-      const original = outlets.find(o => o.id === editingId) || {};
-      const updatedOutlet = {
-        id: editingId,
-        name: newOutlet.name,
-        area: newOutlet.area,
-        contact: newOutlet.contact || "-",
-        phone: newOutlet.phone || "-",
-        status: newOutlet.status,
-        reviewStatus: original.reviewStatus || "ok"
-      };
-      try {
-        await fetch(`${API_URL}/outlets/add`, {
+    try {
+      if (isEditMode && editingId) {
+        // Edit existing outlet
+        const original = outlets.find(o => o.id === editingId) || {};
+        const updatedOutlet = {
+          id: editingId,
+          name: newOutlet.name,
+          area: newOutlet.area,
+          contact: newOutlet.contact || "-",
+          phone: newOutlet.phone || "-",
+          status: newOutlet.status,
+          reviewStatus: original.reviewStatus || "ok"
+        };
+        
+        const res = await fetch(`${API_URL}/outlets/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updatedOutlet),
         });
-        // Fetch latest outlets from backend to ensure status is correct
-        const res = await fetch(`${API_URL}/outlets/all`);
+
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setOutlets(data);
-          }
+          // Refetch to get latest data
+          await fetchOutlets();
+        } else {
+          alert("Failed to update outlet in backend.");
         }
-      } catch (err) {
-        alert("Failed to update outlet in backend.");
-      }
-      setIsEditMode(false);
-      setEditingId(null);
-    } else {
-      // Add new outlet
-      const nextNumber = outlets.length + 1;
-      const id = `OUT-${String(nextNumber).padStart(3, "0")}`;
-      const outletToAdd = {
-        id,
-        name: newOutlet.name,
-        area: newOutlet.area,
-        contact: newOutlet.contact || "-",
-        phone: newOutlet.phone || "-",
-        status: "Active",
-        reviewStatus: "ok",
-      };
-      try {
-        await fetch(`${API_URL}/outlets/add`, {
+        setIsEditMode(false);
+        setEditingId(null);
+      } else {
+        // Add new outlet
+        const nextNumber = outlets.length + 1;
+        const id = `OUT-${String(nextNumber).padStart(3, "0")}`;
+        const outletToAdd = {
+          id,
+          name: newOutlet.name,
+          area: newOutlet.area,
+          contact: newOutlet.contact || "-",
+          phone: newOutlet.phone || "-",
+          status: "Active",
+          reviewStatus: "ok",
+        };
+
+        const res = await fetch(`${API_URL}/outlets/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(outletToAdd),
         });
-        setOutlets((prev) => [outletToAdd, ...prev]);
-        setPage(1);
-      } catch (err) {
-        alert("Failed to add outlet to backend.");
+
+        if (res.ok) {
+          setOutlets((prev) => [outletToAdd, ...prev]);
+          setPage(1);
+        } else {
+          alert("Failed to add outlet to backend.");
+        }
       }
+      setShowAddModal(false);
+    } catch (err) {
+      console.error('Save error:', err);
+      alert("Failed to save outlet.");
     }
-    setShowAddModal(false);
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff7518] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading outlets...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-eggBg px-4 py-6 md:px-8 flex flex-col">
-      {/* Header (title + subtitle) */}
+      {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">
-          Outlets Management
-        </h1>
-        <p className="mt-1 text-sm md:text-base text-gray-500">
-          Manage all your outlets, contact details, and status.
-        </p>
+        <h1 className="text-2xl md:text-3xl font-semibold text-gray-900">Outlets Management</h1>
+        <p className="mt-1 text-sm md:text-base text-gray-500">Manage all your outlets, contact details, and status.</p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
 
       {/* Search + Filter + Add Outlet */}
       <div className="mb-6 space-y-4">
@@ -474,7 +421,7 @@ const handleDeleteOutlet = async (id) => {
               />
             </div>
 
-            {/* Filter + Add Outlet buttons */}
+            {/* Filter + Add buttons */}
             <div className="flex items-center gap-2 md:ml-4">
               <div className="relative">
                 <button
@@ -488,9 +435,7 @@ const handleDeleteOutlet = async (id) => {
 
                 {isFilterOpen && (
                   <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-100 bg-white p-2 text-xs shadow-lg z-20">
-                    <p className="px-2 pb-1 text-[11px] font-semibold uppercase text-gray-400">
-                      Status
-                    </p>
+                    <p className="px-2 pb-1 text-[11px] font-semibold uppercase text-gray-400">Status</p>
                     {["All", "Active", "Inactive"].map((status) => (
                       <button
                         key={status}
@@ -518,9 +463,7 @@ const handleDeleteOutlet = async (id) => {
                 onClick={handleOpenAddModal}
                 className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-md hover:bg-orange-600"
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15">
-                  +
-                </span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/15">+</span>
                 <span>Add Outlet</span>
               </button>
             </div>
@@ -531,43 +474,29 @@ const handleDeleteOutlet = async (id) => {
         <div className="grid gap-3 md:grid-cols-3">
           <div className="flex items-center justify-between rounded-2xl bg-eggWhite px-4 py-3 shadow-sm">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                Total Outlets
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">
-                {metrics.totalOutlets}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Total Outlets</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{metrics.totalOutlets}</p>
             </div>
-            <span className="rounded-full bg-green-50 px-3 py-1 text-[11px] font-medium text-green-700">
-              +4 this month
-            </span>
+            <span className="rounded-full bg-green-50 px-3 py-1 text-[11px] font-medium text-green-700">Active</span>
           </div>
 
           <div className="flex items-center justify-between rounded-2xl bg-eggWhite px-4 py-3 shadow-sm">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                Active Outlets
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">
-                {metrics.activeOutlets}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Active Outlets</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{metrics.activeOutlets}</p>
             </div>
             <span className="text-[11px] font-medium text-gray-500">
-              97% operational
+              {metrics.totalOutlets > 0 ? Math.round((metrics.activeOutlets / metrics.totalOutlets) * 100) : 0}%
             </span>
           </div>
 
           <div className="flex items-center justify-between rounded-2xl bg-eggWhite px-4 py-3 shadow-sm">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                Pending Review
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-gray-900">
-                {metrics.pendingReview}
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Pending Review</p>
+              <p className="mt-2 text-2xl font-semibold text-gray-900">{metrics.pendingReview}</p>
             </div>
             <span className="rounded-full bg-orange-50 px-3 py-1 text-[11px] font-medium text-orange-700">
-              Action required
+              {metrics.pendingReview > 0 ? 'Action' : 'None'}
             </span>
           </div>
         </div>
@@ -581,79 +510,39 @@ const handleDeleteOutlet = async (id) => {
               <tr className="text-left text-[11px] md:text-xs font-semibold text-gray-500">
                 <th className="px-4 py-3 min-w-[220px]">Outlet Name</th>
                 <th className="px-4 py-3 whitespace-nowrap">Area</th>
-                <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">
-                  Contact Person
-                </th>
-                <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">
-                  Phone
-                </th>
+                <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Contact Person</th>
+                <th className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">Phone</th>
                 <th className="px-4 py-3 whitespace-nowrap">Status</th>
-                <th className="px-4 py-3 whitespace-nowrap text-right">
-                  Actions
-                </th>
+                <th className="px-4 py-3 whitespace-nowrap text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {currentPageOutlets.map((outlet, index) => {
-                const avatarClass =
-                  AVATAR_COLORS[index % AVATAR_COLORS.length];
+                const avatarClass = AVATAR_COLORS[index % AVATAR_COLORS.length];
                 const initials = getAvatarInitials(outlet.name);
 
                 return (
-                  <tr
-                    key={outlet.id}
-                    className={`text-xs md:text-sm text-gray-700 ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/60"
-                    }`}
-                  >
+                  <tr key={outlet.id} className={`text-xs md:text-sm text-gray-700 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/60"}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold ${avatarClass}`}
-                        >
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold ${avatarClass}`}>
                           {initials}
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">
-                            {outlet.name}
-                          </p>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-400">
-                            ID: #{outlet.id}
-                          </p>
+                          <p className="font-semibold text-gray-900">{outlet.name}</p>
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">ID: #{outlet.id}</p>
                         </div>
                       </div>
-
-                      {/* On very small screens, show contact + phone stacked */}
                       <div className="mt-2 flex flex-col gap-1 text-[11px] text-gray-500 sm:hidden">
-                        <span>
-                          <span className="font-semibold text-gray-700">
-                            Contact:
-                          </span>{" "}
-                          {outlet.contact}
-                        </span>
-                        <span>
-                          <span className="font-semibold text-gray-700">
-                            Phone:
-                          </span>{" "}
-                          {outlet.phone}
-                        </span>
+                        <span><span className="font-semibold text-gray-700">Contact:</span> {outlet.contact}</span>
+                        <span><span className="font-semibold text-gray-700">Phone:</span> {outlet.phone}</span>
                       </div>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{outlet.area}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-orange-600 hidden sm:table-cell">{outlet.contact}</td>
+                    <td className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">{outlet.phone}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {outlet.area}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-orange-600 hidden sm:table-cell">
-                      {outlet.contact}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap hidden sm:table-cell">
-                      {outlet.phone}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${getStatusBadgeClasses(
-                          outlet.status
-                        )}`}
-                      >
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${getStatusBadgeClasses(outlet.status)}`}>
                         {outlet.status}
                       </span>
                     </td>
@@ -664,19 +553,14 @@ const handleDeleteOutlet = async (id) => {
                         onClick={() => setOpenActionId((id) => (id === outlet.id ? null : outlet.id))}
                         aria-expanded={openActionId === outlet.id}
                         className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-medium text-gray-700 ${
-                          openActionId === outlet.id 
-                            ? "border-gray-200 bg-white ring-2 ring-orange-200" 
-                            : "border-gray-200 bg-white hover:bg-gray-50"
+                          openActionId === outlet.id ? "border-gray-200 bg-white ring-2 ring-orange-200" : "border-gray-200 bg-white hover:bg-gray-50"
                         }`}
                       >
                         ⋮
                       </button>
 
                       {openActionId === outlet.id && (
-                        <div 
-                          data-action-menu 
-                          className="absolute right-0 mt-2 w-36 rounded-lg border border-gray-200 bg-white shadow-lg z-30 text-xs"
-                        >
+                        <div data-action-menu className="absolute right-0 mt-2 w-36 rounded-lg border border-gray-200 bg-white shadow-lg z-30 text-xs">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(outlet)}
@@ -700,10 +584,7 @@ const handleDeleteOutlet = async (id) => {
 
               {currentPageOutlets.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-6 text-center text-xs text-gray-500"
-                  >
+                  <td colSpan={6} className="px-4 py-6 text-center text-xs text-gray-500">
                     No outlets found for the current filters.
                   </td>
                 </tr>
@@ -712,12 +593,10 @@ const handleDeleteOutlet = async (id) => {
           </table>
         </div>
 
-        {/* Footer / Pagination */}
+        {/* Pagination */}
         <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 text-xs md:flex-row md:items-center md:justify-between">
           <p className="text-gray-500">
-            {filteredOutlets.length === 0
-              ? "No results"
-              : `Showing ${fromIndex} to ${toIndex} of ${filteredOutlets.length} results`}
+            {filteredOutlets.length === 0 ? "No results" : `Showing ${fromIndex} to ${toIndex} of ${filteredOutlets.length} results`}
           </p>
 
           <div className="flex items-center justify-end gap-2">
@@ -725,9 +604,7 @@ const handleDeleteOutlet = async (id) => {
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className={`flex h-8 w-20 items-center justify-center rounded-full border text-xs font-medium ${
-                page <= 1
-                  ? "border-gray-100 text-gray-300"
-                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                page <= 1 ? "border-gray-100 text-gray-300" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
               Previous
@@ -736,9 +613,7 @@ const handleDeleteOutlet = async (id) => {
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               className={`flex h-8 w-20 items-center justify-center rounded-full border text-xs font-medium ${
-                page >= totalPages
-                  ? "border-gray-100 text-gray-300"
-                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                page >= totalPages ? "border-gray-100 text-gray-300" : "border-gray-200 text-gray-600 hover:bg-gray-50"
               }`}
             >
               Next
@@ -747,7 +622,7 @@ const handleDeleteOutlet = async (id) => {
         </div>
       </div>
 
-      {/* Add Outlet Modal */}
+      {/* Add/Edit Outlet Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/20 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-eggWhite p-5 shadow-xl">
@@ -771,34 +646,20 @@ const handleDeleteOutlet = async (id) => {
             <form onSubmit={handleSaveNewOutlet} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Outlet Name
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Outlet Name</label>
                   <input
                     type="text"
                     value={newOutlet.name}
-                    onChange={(e) =>
-                      setNewOutlet((prev) => ({
-                        ...prev,
-                        name: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNewOutlet((prev) => ({ ...prev, name: e.target.value }))}
                     className="w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs md:text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Area
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Area</label>
                   <input
                     type="text"
                     value={newOutlet.area}
-                    onChange={(e) =>
-                      setNewOutlet((prev) => ({
-                        ...prev,
-                        area: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNewOutlet((prev) => ({ ...prev, area: e.target.value }))}
                     className="w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs md:text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
                   />
                 </div>
@@ -806,51 +667,30 @@ const handleDeleteOutlet = async (id) => {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Contact Person
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Contact Person</label>
                   <input
                     type="text"
                     value={newOutlet.contact}
-                    onChange={(e) =>
-                      setNewOutlet((prev) => ({
-                        ...prev,
-                        contact: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNewOutlet((prev) => ({ ...prev, contact: e.target.value }))}
                     className="w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs md:text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-gray-700">
-                    Phone
-                  </label>
+                  <label className="text-xs font-medium text-gray-700">Phone</label>
                   <input
                     type="text"
                     value={newOutlet.phone}
-                    onChange={(e) =>
-                      setNewOutlet((prev) => ({
-                        ...prev,
-                        phone: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setNewOutlet((prev) => ({ ...prev, phone: e.target.value }))}
                     className="w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs md:text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-gray-700">
-                  Status
-                </label>
+                <label className="text-xs font-medium text-gray-700">Status</label>
                 <select
                   value={newOutlet.status}
-                  onChange={(e) =>
-                    setNewOutlet((prev) => ({
-                      ...prev,
-                      status: e.target.value,
-                    }))
-                  }
+                  onChange={(e) => setNewOutlet((prev) => ({ ...prev, status: e.target.value }))}
                   className="w-full rounded-xl border border-gray-200 bg-eggBg px-3 py-2 text-xs md:text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-orange-400"
                 >
                   <option value="Active">Active</option>

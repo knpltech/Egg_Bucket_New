@@ -216,12 +216,13 @@ function BaseCalendar({ rows, selectedDate, onSelectDate, showDots }) {
   );
 }
 
-/* ---------------- DAILY ENTRY FORM ---------------- */
+/* ================= DAILY ENTRY FORM ================= */
 
 const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
   const [date, setDate] = useState("");
   const [openCal, setOpenCal] = useState(false);
   const calendarRef = useRef(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   // Click outside to close calendar
   useEffect(() => {
@@ -237,34 +238,37 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
     }
   }, [openCal]);
 
-  // Build outlet names from objects
+  // Build outlet names from objects - only once when outlets change
   const outletNames = useMemo(() => {
     if (!Array.isArray(outlets) || outlets.length === 0) {
-      return ["AECS Layout", "Bandepalya", "Hosa Road", "Singasandra", "Kudlu Gate"];
+      return [];
     }
-    return outlets.map(o => {
-      if (typeof o === 'string') return o;
-      return o.area || o.name || 'Unknown';
-    });
+    return outlets
+      .map(o => {
+        if (typeof o === 'string') return o;
+        return o.area || o.name || null;
+      })
+      .filter(name => name !== null);
   }, [outlets]);
 
-  // Initialize entry values with proper structure
+  // Initialize entry values based on outlet names
   const initializeEntryValues = useCallback(() => {
     const initial = {};
     outletNames.forEach((o) => (initial[o] = ""));
     return initial;
   }, [outletNames]);
 
-  const [entryValues, setEntryValues] = useState(initializeEntryValues);
+  const [entryValues, setEntryValues] = useState(initializeEntryValues());
   const [hasEntry, setHasEntry] = useState(false);
   const [entryTotal, setEntryTotal] = useState(0);
 
   // Reset entry values when outlets change
   useEffect(() => {
     setEntryValues(initializeEntryValues());
-  }, [initializeEntryValues]);
+    setDate("");
+  }, [outletNames, initializeEntryValues]);
 
-  // Update entry state when date or rows change
+  // Update entry state when date changes
   useEffect(() => {
     if (!date) {
       setHasEntry(false);
@@ -278,17 +282,19 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
       setHasEntry(true);
       setEntryTotal(found.total || 0);
       // Set entry values to the found row's values
-      setEntryValues(() => {
-        const vals = {};
-        outletNames.forEach(o => {
-          vals[o] = found.outlets && found.outlets[o] !== undefined ? found.outlets[o] : "";
-        });
-        return vals;
+      const vals = {};
+      outletNames.forEach(o => {
+        vals[o] = found.outlets && found.outlets[o] !== undefined 
+          ? found.outlets[o] 
+          : "";
       });
+      setEntryValues(vals);
     } else {
       setHasEntry(false);
       setEntryTotal(0);
-      setEntryValues(initializeEntryValues());
+      const vals = {};
+      outletNames.forEach(o => (vals[o] = ""));
+      setEntryValues(vals);
     }
   }, [date, rows, outletNames, initializeEntryValues]);
 
@@ -299,21 +305,31 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
     }));
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  // Check if outlet is active
+  const isOutletActive = useCallback((outletName) => {
+    if (!Array.isArray(outlets) || outlets.length === 0) return true;
+    
+    const outletObj = outlets.find(o => {
+      const area = typeof o === 'string' ? o : (o.area || o.name);
+      return area === outletName;
+    });
+    
+    if (!outletObj) return true;
+    if (typeof outletObj === 'string') return true;
+    
+    return !outletObj.status || outletObj.status === "Active";
+  }, [outlets]);
+
+  const handleSubmit = useCallback(async () => {
     if (!date) return alert("Date is required");
     if (hasEntry) return alert("Entry for this date already exists");
 
+    if (outletNames.length === 0) {
+      return alert("No outlets available");
+    }
+
     // Get active outlets
-    const activeOutlets = outletNames.filter((outletName) => {
-      if (!Array.isArray(outlets) || outlets.length === 0) return true;
-      const outletObj = outlets.find(o => {
-        const area = typeof o === 'string' ? o : (o.area || o.name);
-        return area === outletName;
-      });
-      if (!outletObj) return true; // If outlet object not found, consider it active
-      if (typeof outletObj === 'string') return true;
-      return !outletObj.status || outletObj.status === "Active";
-    });
+    const activeOutlets = outletNames.filter((outletName) => isOutletActive(outletName));
     
     // Check if all active outlets are filled
     const allActiveFilled = activeOutlets.every((outlet) => {
@@ -336,39 +352,43 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
       finalValues[outlet] = Number(entryValues[outlet]) || 0;
     });
 
-    addrow({
-      date,
-      outlets: finalValues,
-      total,
-    });
+    setSubmitLoading(true);
+    try {
+      await addrow({
+        date,
+        outlets: finalValues,
+        total,
+      });
 
-    // Reset form
-    setDate("");
-    setEntryValues(initializeEntryValues());
-    setOpenCal(false);
-  }, [date, hasEntry, outletNames, outlets, entryValues, addrow, initializeEntryValues]);
+      // Reset form after successful submission
+      setDate("");
+      setEntryValues(initializeEntryValues());
+      setOpenCal(false);
+    } catch (err) {
+      console.error('Error submitting entry:', err);
+    } finally {
+      setSubmitLoading(false);
+    }
+  }, [date, hasEntry, outletNames, entryValues, addrow, initializeEntryValues, isOutletActive]);
 
-  // Check if outlet is active
-  const isOutletActive = useCallback((outletName) => {
-    if (!Array.isArray(outlets) || outlets.length === 0) return true;
-    
-    const outletObj = outlets.find(o => {
-      const area = typeof o === 'string' ? o : (o.area || o.name);
-      return area === outletName;
-    });
-    
-    if (!outletObj) return true;
-    if (typeof outletObj === 'string') return true;
-    
-    return !outletObj.status || outletObj.status === "Active";
-  }, [outlets]);
+  if (outletNames.length === 0) {
+    return (
+      <div className="bg-white shadow rounded-xl p-6 m-6">
+        <h1 className="text-xl font-bold mb-2">Daily Sales Entry</h1>
+        <p className="text-gray-500 mb-6">Add new daily sales amounts for each outlet.</p>
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <p className="text-sm text-yellow-800">No outlets available. Please wait for outlets to load or add outlets first.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white shadow rounded-xl p-6 m-6">
       <h1 className="text-xl font-bold mb-2">Daily Sales Entry</h1>
       <p className="text-gray-500 mb-6">Add new daily sales amounts for each outlet.</p>
 
-      {/* DATE PICKER - Full width, calendar aligned to icon */}
+      {/* DATE PICKER */}
       <div className="relative mb-6 z-30" ref={calendarRef}>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Select Date
@@ -376,7 +396,7 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
         <button
           type="button"
           onClick={() => setOpenCal(prev => !prev)}
-          className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+          className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-eggBg px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition hover:bg-gray-50"
         >
           <span className="font-medium">
             {date ? formatDateDMY(date) : "dd-mm-yyyy"}
@@ -387,7 +407,7 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
           <div className="mt-2 flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500" />
             <div className="text-xs font-medium text-green-700">
-              Entry ( ₹ {entryTotal}) • Locked
+              Entry ( ₹ {entryTotal.toLocaleString()}) • Locked
             </div>
           </div>
         )}
@@ -407,47 +427,50 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
       </div>
 
       {/* Outlet Inputs - Dynamic based on outlets */}
-      {outletNames.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-5 mb-6">
-          {outletNames.map((outlet) => {
-            const isActive = isOutletActive(outlet);
-            return (
-              <div key={outlet} className="space-y-1">
-                <p className="text-xs font-medium text-gray-600">
-                  {outlet}
-                  {!isActive && <span className="text-red-500 ml-1">(Inactive)</span>}
-                </p>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={entryValues[outlet] || ""}
-                    onChange={(e) => handleEntryChange(outlet, e.target.value)}
-                    disabled={hasEntry || !isActive}
-                    placeholder="0.00"
-                    className={`w-full rounded-xl border border-gray-200 bg-eggBg pl-8 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition ${(hasEntry || !isActive) ? "bg-gray-50 cursor-not-allowed" : ""}`}
-                  />
-                </div>
+      <div className="grid gap-4 md:grid-cols-5 mb-6">
+        {outletNames.map((outlet) => {
+          const isActive = isOutletActive(outlet);
+          return (
+            <div key={outlet} className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">
+                {outlet}
+                {!isActive && <span className="text-red-500 ml-1">(Inactive)</span>}
+              </p>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={entryValues[outlet] || ""}
+                  onChange={(e) => handleEntryChange(outlet, e.target.value)}
+                  disabled={hasEntry || !isActive || submitLoading}
+                  placeholder="0.00"
+                  className={`w-full rounded-xl border border-gray-200 bg-eggBg pl-8 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 transition ${(hasEntry || !isActive || submitLoading) ? "bg-gray-50 cursor-not-allowed opacity-50" : ""}`}
+                />
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-          <p className="text-sm text-yellow-800">No outlets available. Please add outlets first.</p>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Save Button */}
       <div className="flex justify-center">
         <button
           onClick={handleSubmit}
-          disabled={hasEntry || outletNames.length === 0}
-          className={`inline-flex items-center justify-center rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg transition-all ${(hasEntry || outletNames.length === 0) ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
+          disabled={hasEntry || submitLoading}
+          className={`inline-flex items-center justify-center rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg transition-all ${(hasEntry || submitLoading) ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'}`}
         >
-          {hasEntry ? 'Locked' : outletNames.length === 0 ? 'No Outlets' : 'Save Entry'}
+          {submitLoading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Saving...
+            </>
+          ) : hasEntry ? (
+            'Locked'
+          ) : (
+            'Save Entry'
+          )}
         </button>
       </div>
     </div>

@@ -10,14 +10,6 @@ import DailyTable from "../components/DailyTable";
 import Dailyentryform from "../components/Dailyentryform";
 import Weeklytrend from "../components/Weeklytrend";
 
-const SAMPLE_OUTLETS = [
-  { area: "AECS Layout" },
-  { area: "Bandepalya" },
-  { area: "Hosa Road" },
-  { area: "Singasandra" },
-  { area: "Kudlu Gate" },
-];
-
 const OUTLETS_KEY = "egg_outlets_v1";
 
 const Dailysales = () => {
@@ -25,9 +17,10 @@ const Dailysales = () => {
 
   const [rows, setRows] = useState([]);
   const [outlets, setOutlets] = useState([]);
+  const [outletLoading, setOutletLoading] = useState(true);
   
   // Filtered outlets for Data Agent: only show active
-  const filteredOutlets = isDataAgent && Array.isArray(outlets)
+  const filteredOutlets = isDataAgent && Array.isArray(outlets) && outlets.length > 0
     ? outlets.filter(o => {
         if (typeof o === 'string') return true;
         if (typeof o === 'object' && o.status) return o.status === 'Active';
@@ -43,68 +36,86 @@ const Dailysales = () => {
   const [editValues, setEditValues] = useState({});
 
   /* ================= FETCH SALES ================= */
-  useEffect(() => {
-    const fetchSales = async () => {
-      try {
-        const res = await fetch(`${API_URL}/dailysales/all`);
-        const data = await res.json();
+  const fetchSales = useCallback(async () => {
+    try {
+      console.log('Fetching sales data...');
+      const res = await fetch(`${API_URL}/dailysales/all`);
+      const data = await res.json();
 
-        if (Array.isArray(data)) {
-          setRows(data.map(d => ({ id: d.id || d._id, ...d })));
-        } else if (data.success && Array.isArray(data.data)) {
-          setRows(data.data.map(d => ({ id: d.id || d._id, ...d })));
-        } else {
-          setRows([]);
-        }
-      } catch (err) {
-        console.error("Error fetching sales:", err);
+      if (Array.isArray(data)) {
+        setRows(data.map(d => ({ id: d.id || d._id, ...d })));
+      } else if (data.success && Array.isArray(data.data)) {
+        setRows(data.data.map(d => ({ id: d.id || d._id, ...d })));
+      } else {
         setRows([]);
       }
-    };
-    fetchSales();
+      console.log('Sales data updated:', Array.isArray(data) ? data.length : data.data?.length || 0);
+    } catch (err) {
+      console.error("Error fetching sales:", err);
+      setRows([]);
+    }
   }, []);
 
-  /* ================= OUTLETS ================= */
+  useEffect(() => {
+    fetchSales();
+    // Auto-refresh sales every 30 seconds
+    const salesInterval = setInterval(fetchSales, 30000);
+    return () => clearInterval(salesInterval);
+  }, [fetchSales]);
+
+  /* ================= OUTLETS - LOAD ONCE ON MOUNT ================= */
   const loadOutlets = useCallback(async () => {
+    setOutletLoading(true);
     try {
+      console.log('Loading outlets...');
       const res = await fetch(`${API_URL}/outlets/all`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
+          console.log('Outlets loaded from backend:', data.length);
           setOutlets(data);
           localStorage.setItem(OUTLETS_KEY, JSON.stringify(data));
+        } else {
+          throw new Error('Empty outlets response');
         }
+      } else {
+        throw new Error('Failed to fetch outlets');
       }
     } catch (err) {
       console.error("Error fetching outlets:", err);
-      // Fallback to localStorage if fetch fails
+      // Try localStorage as fallback
       const saved = localStorage.getItem(OUTLETS_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log('Using cached outlets from localStorage');
             setOutlets(parsed);
           } else {
-            setOutlets(SAMPLE_OUTLETS);
+            setOutlets([]);
           }
         } catch (parseErr) {
           console.error("Error parsing saved outlets:", parseErr);
-          setOutlets(SAMPLE_OUTLETS);
+          setOutlets([]);
         }
       } else {
-        setOutlets(SAMPLE_OUTLETS);
+        setOutlets([]);
       }
+    } finally {
+      setOutletLoading(false);
     }
   }, []);
 
+  // Load outlets only on component mount
   useEffect(() => {
     loadOutlets();
   }, [loadOutlets]);
 
+  /* ================= OUTLET SYNC - LISTEN FOR UPDATES ================= */
   useEffect(() => {
     const handleOutletsUpdated = (event) => {
-      if (event.detail && Array.isArray(event.detail)) {
-        // Immediately update outlets from the event
+      console.log('Outlets updated event received');
+      if (event.detail && Array.isArray(event.detail) && event.detail.length > 0) {
         setOutlets(event.detail);
         localStorage.setItem(OUTLETS_KEY, JSON.stringify(event.detail));
       }
@@ -112,16 +123,17 @@ const Dailysales = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        console.log('Page visible, reloading outlets');
         loadOutlets();
       }
     };
 
-    // Also listen for storage events from other tabs
     const handleStorageChange = (e) => {
       if (e.key === OUTLETS_KEY && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log('Outlets updated from storage event');
             setOutlets(parsed);
           }
         } catch (err) {
@@ -145,7 +157,6 @@ const Dailysales = () => {
   const getFilteredRows = () => {
     const sortedRows = [...rows].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // If both dates are selected, filter by range
     if (fromDate && toDate) {
       return sortedRows.filter(row => {
         const rowDate = new Date(row.date);
@@ -153,17 +164,14 @@ const Dailysales = () => {
       });
     }
 
-    // If only fromDate is selected
     if (fromDate) {
       return sortedRows.filter(row => new Date(row.date) >= new Date(fromDate));
     }
 
-    // If only toDate is selected
     if (toDate) {
       return sortedRows.filter(row => new Date(row.date) <= new Date(toDate));
     }
 
-    // No filter applied - show all data
     return sortedRows;
   };
 
@@ -218,15 +226,8 @@ const Dailysales = () => {
         return;
       }
 
-      // Refetch all data
-      const res = await fetch(`${API_URL}/dailysales/all`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setRows(data.map(d => ({ id: d.id || d._id, ...d })));
-      } else if (data.success && Array.isArray(data.data)) {
-        setRows(data.data.map(d => ({ id: d.id || d._id, ...d })));
-      }
-
+      // Refetch all data after successful update
+      await fetchSales();
       setEditModalOpen(false);
       setEditRow({});
       setEditValues({});
@@ -249,14 +250,8 @@ const Dailysales = () => {
         return;
       }
 
-      // Refetch all data after adding
-      const res = await fetch(`${API_URL}/dailysales/all`);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setRows(data.map(d => ({ id: d.id || d._id, ...d })));
-      } else if (data.success && Array.isArray(data.data)) {
-        setRows(data.data.map(d => ({ id: d.id || d._id, ...d })));
-      }
+      // Refetch all data after successful add
+      await fetchSales();
     } catch (err) {
       console.error("Error adding sale:", err);
       alert("Error adding entry");
@@ -281,13 +276,27 @@ const Dailysales = () => {
     XLSX.writeFile(wb, "Daily_Sales_Report.xlsx");
   };
 
+  // Show loading state while outlets are loading
+  if (outletLoading) {
+    return (
+      <div className="flex">
+        <div className="bg-eggBg min-h-screen p-6 w-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ff7518] mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading outlets...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex">
       <div className="bg-eggBg min-h-screen p-6 w-full">
         <Topbar />
 
         {/* ================= ENTRY FORM (ADMIN + DATA AGENT) ================= */}
-        {!isViewer && (
+        {!isViewer && outlets.length > 0 && (
           <div className="mt-4 mb-8">
             <Dailyentryform
               addrow={addrow}
@@ -298,8 +307,15 @@ const Dailysales = () => {
           </div>
         )}
 
+        {/* No outlets warning */}
+        {!isViewer && outlets.length === 0 && (
+          <div className="mt-4 mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+            <p className="text-sm text-yellow-800">No outlets available. Please add outlets first.</p>
+          </div>
+        )}
+
         {/* ================= HEADER ================= */}
-        {(isAdmin || isViewer || isDataAgent) && (
+        {(isAdmin || isViewer || isDataAgent) && outlets.length > 0 && (
           <Dailyheader 
             dailySalesData={filteredRows}
             fromDate={fromDate}
@@ -311,7 +327,7 @@ const Dailysales = () => {
         )}
 
         {/* ================= TABLE (ADMIN + VIEWER + DATA AGENT) ================= */}
-        {(isAdmin || isViewer || isDataAgent) && (
+        {(isAdmin || isViewer || isDataAgent) && outlets.length > 0 && (
           <DailyTable
             rows={filteredRows}
             outlets={filteredOutlets}
@@ -320,7 +336,7 @@ const Dailysales = () => {
         )}
 
         {/* ================= EDIT MODAL (ADMIN ONLY) ================= */}
-        {isAdmin && editModalOpen && (
+        {isAdmin && editModalOpen && outlets.length > 0 && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
             <div className="bg-white rounded-xl p-6 min-w-[320px] max-w-full max-h-[80vh] overflow-y-auto">
               <h2 className="font-semibold mb-4 text-lg">
@@ -370,7 +386,7 @@ const Dailysales = () => {
         )}
 
         {/* ================= WEEKLY TREND (ADMIN ONLY) ================= */}
-        {isAdmin && (
+        {isAdmin && outlets.length > 0 && (
           <div className="mt-10">
             <Weeklytrend rows={rows} />
           </div>
