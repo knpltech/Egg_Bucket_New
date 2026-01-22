@@ -26,7 +26,7 @@ export const getAvailableOutlets = async (req, res) => {
       db.collection('dailySales').limit(50).get(),
       db.collection('digitalPayments').limit(50).get(),
       db.collection('cashPayments').limit(50).get(),
-      db.collection('neccRate').limit(50).get()
+      db.collection('neccRates').limit(50).get()
     ]);
 
     console.log('📊 Found records:', {
@@ -104,7 +104,7 @@ export const getReports = async (req, res) => {
       db.collection('dailySales').limit(100).get(),
       db.collection('digitalPayments').limit(100).get(),
       db.collection('cashPayments').limit(100).get(),
-      db.collection('neccRate').limit(100).get(),
+      db.collection('neccRates').limit(100).get(),
       db.collection('dailyDamages').limit(100).get()
     ]);
 
@@ -186,16 +186,37 @@ export const getReports = async (req, res) => {
     // Process NECC rate - might be stored differently
     neccRateSnapshot.forEach(doc => {
       const data = doc.data();
-      const dateKey = formatDate(data.date || data.createdAt);
-      
-      if (dateMap[dateKey]) {
-        // Try different structures for NECC rate
-        if (data.outlets && data.outlets[outletId] !== undefined) {
-          dateMap[dateKey].neccRate = parseFloat(data.outlets[outletId] || 0);
-        } else if (data.rate !== undefined) {
-          // If NECC rate is global (not per outlet)
-          dateMap[dateKey].neccRate = parseFloat(data.rate || 0);
+      // Normalize NECC rate entry date to report dateKey format
+      let entryDate = data.date;
+      if (typeof entryDate === 'string') {
+        // Try to parse DD-MM-YYYY or YYYY-MM-DD
+        const parts = entryDate.split('-');
+        if (parts.length === 3) {
+          // If DD-MM-YYYY
+          if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+            entryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          } else {
+            entryDate = new Date(entryDate);
+          }
+        } else {
+          entryDate = new Date(entryDate);
         }
+      } else if (entryDate && entryDate.toDate) {
+        entryDate = entryDate.toDate();
+      } else {
+        entryDate = new Date(entryDate);
+      }
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const normalizedDateKey = `${months[entryDate.getMonth()]} ${String(entryDate.getDate()).padStart(2, '0')}, ${entryDate.getFullYear()}`;
+      // Always use the 'rate' field from neccrate collection for the date
+      if (dateMap[normalizedDateKey] && data.rate !== undefined) {
+        let rateValue = data.rate;
+        if (typeof rateValue === 'string') {
+          // Extract first number (integer or decimal) from string
+          const match = rateValue.match(/([0-9]+(\.[0-9]+)?)/);
+          rateValue = match ? parseFloat(match[1]) : 0;
+        }
+        dateMap[normalizedDateKey].neccRate = typeof rateValue === 'number' ? rateValue : 0;
       }
     });
 
@@ -224,13 +245,7 @@ export const getReports = async (req, res) => {
 
     // Convert to array and calculate
     let transactions = Object.values(dateMap).map(t => {
-      // If no NECC rate per outlet, try to calculate from total/quantity
-      if (t.neccRate === 0 && t.salesQty > 0) {
-        const totalReceived = t.digitalPay + t.cashPay;
-        if (totalReceived > 0) {
-          t.neccRate = parseFloat((totalReceived / t.salesQty).toFixed(2));
-        }
-      }
+      // Only use NECC rate from neccrate collection; do not calculate or fallback
       t.totalAmount = parseFloat((t.salesQty * t.neccRate).toFixed(2));
       t.totalRecv = parseFloat((t.digitalPay + t.cashPay).toFixed(2));
       t.difference = parseFloat((t.totalRecv - t.totalAmount).toFixed(2));

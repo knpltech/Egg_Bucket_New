@@ -11,10 +11,14 @@ import { useEffect, useState } from "react";
 
 /* ---------------- HELPERS ---------------- */
 
-// Convert "₹6.50 per egg" → 6.5
-function parseRate(rateString) {
-  if (!rateString) return 0;
-  return Number(rateString.replace(/[^\d.]/g, ""));
+// Convert "₹6.50 per egg" or 6.5 → 6.5
+function parseRate(rateValue) {
+  if (!rateValue) return 0;
+  if (typeof rateValue === 'number') return rateValue;
+  if (typeof rateValue === 'string') {
+    return Number(rateValue.replace(/[^\d.]/g, ""));
+  }
+  return 0;
 }
 
 // Supports both dd-mm-yyyy and yyyy-mm-dd

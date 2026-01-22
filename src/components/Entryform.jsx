@@ -259,7 +259,7 @@ const Entryform = ({ addRow, blockedDates, rows }) => {
     }
     addRow({
       date,
-      rate: `₹${rate} per egg`,
+      rate: `₹${rate}`,
       remarks: remarks || "—",
     });
     setDate("");
