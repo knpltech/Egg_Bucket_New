@@ -437,7 +437,7 @@ const Dailyentryform = ({ addrow, blockeddates, rows, outlets = [] }) => {
                 {!isActive && <span className="text-red-500 ml-1">(Inactive)</span>}
               </p>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₹</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></span>
                 <input
                   type="number"
                   min="0"

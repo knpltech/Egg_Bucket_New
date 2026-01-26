@@ -86,7 +86,7 @@ export default function Sidebar() {
             </Link>
             <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}> 
               <FontAwesomeIcon icon={faIndianRupeeSign} />
-              {open && "Daily Sales"}
+              {open && "Daily Sales Quantity"}
             </Link>
             <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}> 
               <FontAwesomeIcon icon={faWallet} />

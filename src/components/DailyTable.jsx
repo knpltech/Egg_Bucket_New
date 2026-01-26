@@ -75,7 +75,7 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
                 </td>
                 {outletNames.map((outlet, j) => (
                   <td key={String(outlet) + '-' + j} className="whitespace-nowrap px-4 py-3">
-                    ₹{
+                    {
                         row.outlets
                           ? row.outlets[outlet] ?? 0
                           : row[outlet] ?? 0
@@ -83,7 +83,7 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
                   </td>
                 ))}
                 <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-orange-600">
-                  ₹{row.total}
+                  {row.total}
                 </td>
                 {/* Edit button for admin */}
                 {typeof window !== 'undefined' && localStorage.getItem('user') && (() => {
@@ -106,11 +106,11 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
               <td className="whitespace-nowrap px-4 py-3">Grand Total</td>
               {outletNames.map((outlet, i) => (
                 <td key={String(outlet) + '-total-' + i} className="whitespace-nowrap px-4 py-3">
-                  ₹{totals[outlet]}
+                  {totals[outlet]}
                 </td>
               ))}
               <td className="whitespace-nowrap px-4 py-3 text-right text-orange-800">
-                ₹{grandTotal}
+                {grandTotal}
               </td>
             </tr>
           </tbody>
