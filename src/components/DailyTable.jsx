@@ -10,7 +10,7 @@ function formatDisplayDate(iso) {
   });
 }
 
-export default function DailyTable({rows, outlets = [], onEdit}) {
+export default function DailyTable({rows, outlets = [], onEdit, showRupee = false}) {
 
   // Build outlet names from objects or use defaults
   const outletNames = Array.isArray(outlets) && outlets.length > 0 
@@ -34,6 +34,23 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
     const outletObj = outlets.find(o => o.area === outletName);
     if (!outletObj || typeof outletObj.status === 'undefined') return true;
     return outletObj.status === "Active";
+  };
+
+  // Currency formatter for ₹
+  const formatCurrencyNoDecimals = (value) => {
+    if (showRupee) {
+      if (value == null || isNaN(value)) return "₹0";
+      return "₹" + Number(value).toLocaleString("en-IN", {
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+      });
+    } else {
+      if (value == null || isNaN(value)) return "0";
+      return Number(value).toLocaleString("en-IN", {
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+      });
+    }
   };
 
   return (
@@ -75,15 +92,15 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
                 </td>
                 {outletNames.map((outlet, j) => (
                   <td key={String(outlet) + '-' + j} className="whitespace-nowrap px-4 py-3">
-                    {
-                        row.outlets
-                          ? row.outlets[outlet] ?? 0
-                          : row[outlet] ?? 0
-                      }
+                    {formatCurrencyNoDecimals(
+                      row.outlets
+                        ? row.outlets[outlet] ?? 0
+                        : row[outlet] ?? 0
+                    )}
                   </td>
                 ))}
                 <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-orange-600">
-                  {row.total}
+                  {formatCurrencyNoDecimals(row.total)}
                 </td>
                 {/* Edit button for admin */}
                 {typeof window !== 'undefined' && localStorage.getItem('user') && (() => {
@@ -106,11 +123,11 @@ export default function DailyTable({rows, outlets = [], onEdit}) {
               <td className="whitespace-nowrap px-4 py-3">Grand Total</td>
               {outletNames.map((outlet, i) => (
                 <td key={String(outlet) + '-total-' + i} className="whitespace-nowrap px-4 py-3">
-                  {totals[outlet]}
+                  {formatCurrencyNoDecimals(totals[outlet])}
                 </td>
               ))}
               <td className="whitespace-nowrap px-4 py-3 text-right text-orange-800">
-                {grandTotal}
+                {formatCurrencyNoDecimals(grandTotal)}
               </td>
             </tr>
           </tbody>

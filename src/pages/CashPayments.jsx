@@ -624,7 +624,7 @@ export default function CashPayments() {
             )}
           </div>
 
-          <DailyTable rows={filteredRows} outlets={outlets} onEdit={handleEditClick} />
+          <DailyTable rows={filteredRows} outlets={outlets} onEdit={handleEditClick} showRupee={true} />
 
           {editModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30 p-4">

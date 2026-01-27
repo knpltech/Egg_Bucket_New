@@ -180,7 +180,7 @@ export default function Sidebar() {
             {(dataAgentRoles.includes("daily_sales")) && (
               <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}> 
                 <FontAwesomeIcon icon={faIndianRupeeSign} />
-                {open && "Daily Sales"}
+                {open && "Daily Sales Quantity"}
               </Link>
             )}
             {(dataAgentRoles.includes("digital_payments")) && (
