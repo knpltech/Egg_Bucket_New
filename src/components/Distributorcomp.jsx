@@ -28,10 +28,10 @@ const Distributorcomp = () => {
 
   const roles = [
     {
-      name: "Daily Sales",
-      value: "daily_sales",
-      icon: faChartLine,
-      desc: "Manage daily egg sales records.",
+      name: "Daily Damage",
+      value: "daily_damages",
+      icon: faArrowsSplitUpAndLeft,
+      desc: "Manage daily egg damage records.",
     },
     {
       name: "Outlets",
