@@ -58,7 +58,7 @@ const Distributorcomp = () => {
       desc: "Average amount of eggs.",
     },
     {
-      name: "Daily Sales",
+      name: "Daily Sales Quantity",
       value: "daily_sales",
       icon: faChartLine,
       desc: "Manage daily egg sales records.",

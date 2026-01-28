@@ -259,7 +259,7 @@ const Dailyheader = ({ dailySalesData = [], fromDate, toDate, setFromDate, setTo
 
       {/* TITLE */}
       <div>
-        <h1 className="text-2xl font-bold">Daily Sales</h1>
+        <h1 className="text-2xl font-bold">Daily Sales Quantity</h1>
         <p className="text-gray-600 text-sm">
           Manage and track daily egg sales across all outlets.
         </p>
