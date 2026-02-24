@@ -2,31 +2,44 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import logo from "../assets/Logo.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserPlus } from "@fortawesome/free-solid-svg-icons";
-import { faIndianRupeeSign } from "@fortawesome/free-solid-svg-icons";
-import { faMoneyBillWave } from "@fortawesome/free-solid-svg-icons";
+
 import {
   faTableCells,
   faEgg,
-  faDollarSign,
   faWallet,
-  faTruck,
   faStore,
   faChartLine,
   faUsers,
   faRightFromBracket,
   faExclamationTriangle,
+  faUserPlus,
+  faIndianRupeeSign,
+  faMoneyBillWave,
+  faPenToSquare,   // ✅ NEW ICON
 } from "@fortawesome/free-solid-svg-icons";
 
 export default function Sidebar() {
-  // Get user from localStorage
   let user = null;
   try {
     user = JSON.parse(localStorage.getItem("user"));
   } catch {}
-  const isAdmin = user && (user.role === "Admin" || (Array.isArray(user.roles) && user.roles.includes("admin")));
-  const isViewer = user && (user.role === "Viewer" || (Array.isArray(user.roles) && user.roles.includes("viewer")));
-  const dataAgentRoles = Array.isArray(user?.roles) ? user.roles : (user?.role ? [user.role] : []);
+
+  const isAdmin =
+    user &&
+    (user.role === "Admin" ||
+      (Array.isArray(user.roles) && user.roles.includes("admin")));
+
+  const isViewer =
+    user &&
+    (user.role === "Viewer" ||
+      (Array.isArray(user.roles) && user.roles.includes("viewer")));
+
+  const dataAgentRoles = Array.isArray(user?.roles)
+    ? user.roles
+    : user?.role
+    ? [user.role]
+    : [];
+
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(true);
@@ -49,11 +62,18 @@ export default function Sidebar() {
         open ? "w-64" : "w-20"
       }`}
     >
-
       {/* Logo */}
-      <div className="mb-8 flex items-center gap-2 justify-center">
-        <div className={`inline-block bg-orange-50 rounded ${open ? 'p-2' : 'p-1'}`}>
-          <img src={logo} alt="Egg Bucket Logo" className={`h-10 sm:h-12 md:h-14 w-auto object-contain mix-blend-multiply opacity-95`} />
+      <div className="mb-8 flex items-center justify-center">
+        <div
+          className={`inline-block bg-orange-50 rounded ${
+            open ? "p-2" : "p-1"
+          }`}
+        >
+          <img
+            src={logo}
+            alt="Egg Bucket Logo"
+            className="h-10 sm:h-12 md:h-14 w-auto object-contain mix-blend-multiply opacity-95"
+          />
         </div>
       </div>
 
@@ -70,139 +90,100 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="space-y-2">
-        {/* Admin: show all links. Data Agent: show only allowed links. Viewer: show only data pages. */}
+
+        {/* ---------------- ADMIN ---------------- */}
         {isAdmin && (
           <>
-            <Link to="/admin/dashboard" className={linkClass("/admin/dashboard")}> 
+            <Link to="/admin/dashboard" className={linkClass("/admin/dashboard")}>
               <FontAwesomeIcon icon={faTableCells} />
               {open && "Dashboard"}
             </Link>
-            <Link to="/admin/damages" className={linkClass("/admin/damages")}> 
+
+            <Link to="/admin/damages" className={linkClass("/admin/damages")}>
               <FontAwesomeIcon icon={faExclamationTriangle} />
               {open && "Daily Damages"}
             </Link>
-            <Link to="/admin/neccrate" className={linkClass("/admin/neccrate")}> 
+
+            <Link to="/admin/neccrate" className={linkClass("/admin/neccrate")}>
               <FontAwesomeIcon icon={faEgg} />
               {open && "NECC Rate"}
             </Link>
-            <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}> 
+
+            <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}>
               <FontAwesomeIcon icon={faIndianRupeeSign} />
               {open && "Daily Sales Quantity"}
             </Link>
-            <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}> 
+
+            <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}>
               <FontAwesomeIcon icon={faWallet} />
               {open && "Digital Payments"}
             </Link>
-            <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}> 
+
+            <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}>
               <FontAwesomeIcon icon={faMoneyBillWave} />
               {open && "Cash Payments"}
             </Link>
-            <Link to="/admin/distribution" className={linkClass("/admin/distribution")}> 
+
+            {/* ✅ NEW DATA ENTRY OPTION */}
+            <Link to="/admin/data-entry" className={linkClass("/admin/data-entry")}>
+              <FontAwesomeIcon icon={faPenToSquare} />
+              {open && "Data Entry"}
+            </Link>
+
+            <Link to="/admin/distribution" className={linkClass("/admin/distribution")}>
               <FontAwesomeIcon icon={faUsers} />
               {open && "Add Data Agent & Supervisor"}
             </Link>
-            <Link to="/admin/outlets" className={linkClass("/admin/outlets")}> 
+
+            <Link to="/admin/outlets" className={linkClass("/admin/outlets")}>
               <FontAwesomeIcon icon={faStore} />
               {open && "Outlets"}
             </Link>
-            <Link to="/admin/users" className={linkClass("/admin/users")}> 
+
+            <Link to="/admin/users" className={linkClass("/admin/users")}>
               <FontAwesomeIcon icon={faUsers} />
               {open && "Users"}
             </Link>
+
+            <Link to="/admin/reports" className={linkClass("/admin/reports")}>
+              <FontAwesomeIcon icon={faChartLine} />
+              {open && "Reports"}
+            </Link>
           </>
         )}
+
+        {/* ---------------- VIEWER ---------------- */}
         {isViewer && (
           <>
-            <Link to="/admin/damages" className={linkClass("/admin/damages")}> 
+            <Link to="/admin/damages" className={linkClass("/admin/damages")}>
               <FontAwesomeIcon icon={faExclamationTriangle} />
               {open && "Daily Damages"}
             </Link>
-            <Link to="/admin/neccrate" className={linkClass("/admin/neccrate")}> 
+
+            <Link to="/admin/neccrate" className={linkClass("/admin/neccrate")}>
               <FontAwesomeIcon icon={faEgg} />
               {open && "NECC Rate"}
             </Link>
-            <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}> 
+
+            <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}>
               <FontAwesomeIcon icon={faIndianRupeeSign} />
               {open && "Daily Sales"}
             </Link>
-            <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}> 
+
+            <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}>
               <FontAwesomeIcon icon={faWallet} />
               {open && "Digital Payments"}
             </Link>
-            <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}> 
+
+            <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}>
               <FontAwesomeIcon icon={faMoneyBillWave} />
               {open && "Cash Payments"}
             </Link>
-              <Link to="/admin/reports" className={linkClass("/admin/reports")}> 
-            <FontAwesomeIcon icon={faChartLine} />
-            {open && "Reports"}
-          </Link>
-          </>
-        )}
-        {dataAgentRoles && dataAgentRoles.includes("distribution") && !isAdmin && (
-          <Link to="/admin/distribution" className={linkClass("/admin/distribution")}> 
-            <FontAwesomeIcon icon={faUserPlus} />
-            {open && "Add Data Agent"}
-          </Link>
-        )}
-        {dataAgentRoles && dataAgentRoles.includes("outlets") && !isAdmin && (
-          <Link to="/admin/outlets" className={linkClass("/admin/outlets")}> 
-            <FontAwesomeIcon icon={faStore} />
-            {open && "Outlets"}
-          </Link>
-        )}
-        {isAdmin && (
-          <Link to="/admin/reports" className={linkClass("/admin/reports")}> 
-            <FontAwesomeIcon icon={faChartLine} />
-            {open && "Reports"}
-          </Link>
-        )}
-        {/* Removed duplicate Users link for admin */}
-        {!isAdmin && !isViewer && (
-          <>
-            {(dataAgentRoles.includes("dashboard")) && (
-              <Link to="/admin/dashboard" className={linkClass("/admin/dashboard")}> 
-                <FontAwesomeIcon icon={faTableCells} />
-                {open && "Dashboard"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("daily_damages")) && (
-              <Link to="/admin/damages" className={linkClass("/admin/damages")}> 
-                <FontAwesomeIcon icon={faExclamationTriangle} />
-                {open && "Daily Damages"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("neccrate")) && (
-              <Link to="/admin/neccrate" className={linkClass("/admin/neccrate")}> 
-                <FontAwesomeIcon icon={faEgg} />
-                {open && "NECC Rate"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("daily_sales")) && (
-              <Link to="/admin/dailysales" className={linkClass("/admin/dailysales")}> 
-                <FontAwesomeIcon icon={faIndianRupeeSign} />
-                {open && "Daily Sales Quantity"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("digital_payments")) && (
-              <Link to="/admin/digital-payments" className={linkClass("/admin/digital-payments")}> 
-                <FontAwesomeIcon icon={faWallet} />
-                {open && "Digital Payments"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("cash_payments")) && (
-              <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}> 
-                <FontAwesomeIcon icon={faMoneyBillWave} />
-                {open && "Cash Payments"}
-              </Link>
-            )}
-            {(dataAgentRoles.includes("distribution")) && (
-              <Link to="/admin/distribution" className={linkClass("/admin/distribution")}> 
-                <FontAwesomeIcon icon={faUsers} />
-                {open && "Add Data Agent & Supervisor"}
-              </Link>
-            )}
-            {/* Removed duplicate Outlets link for data agents */}
+
+            <Link to="/admin/reports" className={linkClass("/admin/reports")}>
+              <FontAwesomeIcon icon={faChartLine} />
+              {open && "Reports"}
+            </Link>
           </>
         )}
       </nav>
