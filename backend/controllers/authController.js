@@ -1,5 +1,4 @@
-import dotenv from 'dotenv';
-dotenv.config();
+
 import { db } from "../config/firebase.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
