@@ -2,6 +2,7 @@ import "./config/firebase.js";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -47,7 +48,19 @@ app.listen(PORT, () =>
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendPath = path.join(__dirname, "../dist");
-app.use(express.static(frontendPath));
+
+// Serve frontend ONLY if dist exists
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
+  });
+
+  console.log("✅ Frontend static files enabled");
+} else {
+  console.log("⚠️ Frontend dist folder not found, serving API only");
+}
 
 // Fallback: serve index.html for any non-API route (SPA support)
 app.get(/^(?!\/api).*/, (req, res) => {
