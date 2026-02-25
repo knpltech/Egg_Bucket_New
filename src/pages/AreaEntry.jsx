@@ -68,14 +68,15 @@ export default function AreaEntry() {
       }
 
       if (Number(damage) > 0) {
-        await fetch(`${API_URL}/damages/add`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date,
-            quantity: Number(damage),
-          }),
-        });
+          await fetch(`${API_URL}/daily-damage/add-daily-damage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date,
+              damages: { [area]: Number(damage) },
+              total: Number(damage),
+            }),
+          });
       }
 
       if (Number(digital) > 0) {

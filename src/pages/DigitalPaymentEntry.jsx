@@ -23,8 +23,8 @@ export default function DigitalPaymentEntry() {
 
           const initial = {};
           data.forEach((o) => {
-            const area = o.area || o;
-            initial[area] = "";
+            const key = o.id || o.name || o.area || o;
+            initial[key] = "";
           });
 
           setValues(initial);
@@ -54,8 +54,8 @@ export default function DigitalPaymentEntry() {
 
     const outletAmounts = {};
     outlets.forEach((o) => {
-      const area = o.area || o;
-      outletAmounts[area] = Number(values[area]) || 0;
+      const key = o.id || o.name || o.area || o;
+      outletAmounts[key] = Number(values[key]) || 0;
     });
 
     setLoading(true);
@@ -118,18 +118,19 @@ export default function DigitalPaymentEntry() {
           {/* Outlet Fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {outlets.map((o) => {
-              const area = o.area || o;
+              const key = o.id || o.name || o.area || o;
+              const label = o.name || o.area || o.id || o;
               return (
-                <div key={area}>
+                <div key={key}>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    {area}
+                    {label}
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={values[area] || ""}
+                    value={values[key] || ""}
                     onChange={(e) =>
-                      handleChange(area, e.target.value)
+                      handleChange(key, e.target.value)
                     }
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="Enter amount"

@@ -23,8 +23,8 @@ export default function DailyDamageEntry() {
 
           const initial = {};
           data.forEach((o) => {
-            const area = o.area || o;
-            initial[area] = "";
+            const key = o.id || o.name || o.area || o;
+            initial[key] = "";
           });
           setValues(initial);
         }
@@ -54,23 +54,26 @@ export default function DailyDamageEntry() {
     }
 
     let total = 0;
+    const outletAmounts = {};
 
-    Object.keys(values).forEach((area) => {
-      total += Number(values[area]) || 0;
+    Object.keys(values).forEach((key) => {
+      const val = Number(values[key]) || 0;
+      outletAmounts[key] = val;
+      total += val;
     });
 
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/damages/add`, {
+      const response = await fetch(`${API_URL}/daily-damage/add-daily-damage`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           date,
-          outlets: values,
-          quantity: total,
+          damages: outletAmounts,
+          total: total,
           remarks: "Outlet-wise damage entry",
         }),
       });
@@ -117,18 +120,19 @@ export default function DailyDamageEntry() {
           {/* Outlet Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {outlets.map((o) => {
-              const area = o.area || o;
+              const key = o.id || o.name || o.area || o;
+              const label = o.name || o.area || o.id || o;
               return (
-                <div key={area}>
+                <div key={key}>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    {area}
+                    {label}
                   </label>
                   <input
                     type="number"
                     min="0"
-                    value={values[area] || ""}
+                    value={values[key] || ""}
                     onChange={(e) =>
-                      handleChange(area, e.target.value)
+                      handleChange(key, e.target.value)
                     }
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="Enter damaged quantity"

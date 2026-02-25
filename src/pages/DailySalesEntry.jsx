@@ -23,8 +23,8 @@ export default function DailySalesEntry() {
 
           const initial = {};
           data.forEach((o) => {
-            const area = o.area || o;
-            initial[area] = "";
+            const key = o.id || o.name || o.area || o;
+            initial[key] = "";
           });
           setValues(initial);
         }
@@ -53,10 +53,13 @@ export default function DailySalesEntry() {
       return;
     }
 
+    const outletAmounts = {};
     let total = 0;
 
-    Object.keys(values).forEach((area) => {
-      total += Number(values[area]) || 0;
+    Object.keys(values).forEach((k) => {
+      const v = Number(values[k]) || 0;
+      outletAmounts[k] = v;
+      total += v;
     });
 
     setLoading(true);
@@ -69,7 +72,7 @@ export default function DailySalesEntry() {
         },
         body: JSON.stringify({
           date,
-          outlets: values,
+          outlets: outletAmounts,
           total,
         }),
       });
@@ -116,18 +119,19 @@ export default function DailySalesEntry() {
           {/* Outlet Inputs Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {outlets.map((o) => {
-              const area = o.area || o;
+              const key = o.id || o.name || o.area || o;
+              const label = o.name || o.area || o.id || o;
               return (
-                <div key={area}>
+                <div key={key}>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    {area}
+                    {label}
                   </label>
                   <input
                     type="number"
                     min="0"
-                    value={values[area] || ""}
+                    value={values[key] || ""}
                     onChange={(e) =>
-                      handleChange(area, e.target.value)
+                      handleChange(key, e.target.value)
                     }
                     className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
                     placeholder="Enter sales quantity"

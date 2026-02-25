@@ -1,3 +1,5 @@
+import { db } from "../config/firebase.js";
+
 // Update a digital payment entry by ID
 export const updateDigitalPayment = async (req, res) => {
   try {
@@ -18,16 +20,38 @@ export const updateDigitalPayment = async (req, res) => {
     res.status(500).json({ message: "Error updating digital payment", error: error.message });
   }
 };
-import { db } from "../config/firebase.js";
 
 // Add a new digital payment entry to Firestore
+// Merge into existing date doc and prevent overwriting outlet values
 export const addDigitalPayment = async (req, res) => {
   try {
     const { date, outlets } = req.body;
     if (!date || !outlets || typeof outlets !== 'object') {
       return res.status(400).json({ message: "Missing or invalid required fields" });
     }
-    // Calculate total
+
+    const snapshot = await db.collection("digitalPayments").where("date", "==", date).limit(1).get();
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      const data = doc.data();
+      const existingOutlets = data.outlets || {};
+
+      for (const k of Object.keys(outlets)) {
+        if (existingOutlets[k] !== undefined) {
+          return res.status(409).json({ message: `Digital payment for outlet '${k}' already exists for ${date}` });
+        }
+      }
+
+      const updatePayload = {};
+      for (const [k, v] of Object.entries(outlets)) {
+        updatePayload[`outlets.${k}`] = Number(v);
+      }
+
+      await db.collection("digitalPayments").doc(doc.id).update(updatePayload);
+      const updated = await db.collection("digitalPayments").doc(doc.id).get();
+      return res.status(200).json({ id: doc.id, ...updated.data(), message: 'Digital payment merged' });
+    }
+
     const total = Object.values(outlets).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
     const docRef = await db.collection("digitalPayments").add({
       date,

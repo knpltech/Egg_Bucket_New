@@ -27,6 +27,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [outletsLoading, setOutletsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: '',
     to: ''
@@ -63,7 +64,7 @@ const Reports = () => {
         const outletsData = await fetchOutlets();
         // Always use outlet name as id for dropdown and API calls
         const normalizedOutlets = outletsData.map(o => ({
-          id: o.name || o.id, // Use name as id if available
+          id: o.id || o.name,
           name: o.name || o.id
         }));
         setOutlets(normalizedOutlets);
@@ -87,44 +88,49 @@ const Reports = () => {
     fetchAllOutletNames().then(setDebugOutletNames);
   }, []);
 
-  // Fetch report data when outlet or date range changes
+  // Fetch report data when outlet or date range changes; expose loadReportData for polling
+  const loadReportData = async () => {
+    if (!selectedOutlet) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const filters = {};
+      if (dateRange.from) filters.dateFrom = dateRange.from;
+      if (dateRange.to) filters.dateTo = dateRange.to;
+
+      const data = await fetchReportsData(selectedOutlet, filters);
+
+      // Sort transactions in ascending order by date
+      if (data && data.transactions) {
+        data.transactions = [...data.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+        if (!dateRange.from && !dateRange.to) {
+          data.transactions = data.transactions.slice(-7);
+        }
+      }
+
+      setReportData(data);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Failed to fetch report data:', err);
+      setError('Failed to load report data');
+      setReportData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReportData();
+  }, [selectedOutlet, dateRange]);
+
+  // Poll for updates every 10 seconds while a selection is active
   useEffect(() => {
     if (!selectedOutlet) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const filters = {};
-        if (dateRange.from) filters.dateFrom = dateRange.from;
-        if (dateRange.to) filters.dateTo = dateRange.to;
-
-        const data = await fetchReportsData(selectedOutlet, filters);
-        
-        // Sort transactions in ascending order by date
-        if (data && data.transactions) {
-          data.transactions = [...data.transactions].sort((a, b) => 
-            new Date(a.date) - new Date(b.date)
-          );
-          
-          // If no filters applied, ensure we show at least 7 entries (last 7)
-          if (!dateRange.from && !dateRange.to) {
-            data.transactions = data.transactions.slice(-7);
-          }
-        }
-        
-        setReportData(data);
-      } catch (err) {
-        console.error('Failed to fetch report data:', err);
-        setError('Failed to load report data');
-        setReportData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    const interval = setInterval(() => {
+      loadReportData();
+    }, 10000); // 10s
+    return () => clearInterval(interval);
   }, [selectedOutlet, dateRange]);
 
   // Handle quick date range selection
@@ -368,6 +374,7 @@ const Reports = () => {
                   onChange={(e) => setSelectedOutlet(e.target.value)}
                   disabled={loading}
                 >
+                  <option value="ALL">All Outlets</option>
                   {outlets
                     .filter(
                       outlet => outlet.status !== 'Inactive'
@@ -495,6 +502,14 @@ const Reports = () => {
               >
                 Download Data
               </button>
+              <button
+                type="button"
+                onClick={() => loadReportData()}
+                disabled={loading}
+                className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 ml-2"
+              >
+                Refresh
+              </button>
             </div>
           </div>
 
@@ -565,10 +580,53 @@ const Reports = () => {
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-bold text-gray-900">₹ {averageClosingBalance.toLocaleString()}</span>
                 </div>
+                {lastUpdated && (
+                  <div className="mt-2 text-xs text-gray-400">Updated: {new Date(lastUpdated).toLocaleTimeString()}</div>
+                )}
               </div>
             </div>
 
             {/* Transactions Table with Totals */}
+            {/* If backend returned aggregated per-outlet totals (ALL), show per-outlet table */}
+            {reportData.outletsTotals && (
+              <div className="overflow-hidden rounded-2xl bg-white shadow-sm mb-6">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="text-left text-xs font-semibold text-gray-500">
+                        <th className="px-4 py-3">OUTLET</th>
+                        <th className="px-4 py-3 text-right">QUANTITY</th>
+                        <th className="px-4 py-3 text-right">AMOUNT</th>
+                        <th className="px-4 py-3 text-right">DIGITAL</th>
+                        <th className="px-4 py-3 text-right">CASH</th>
+                        <th className="px-4 py-3 text-right">TOTAL RECV.</th>
+                        <th className="px-4 py-3 text-right">DAMAGES</th>
+                        <th className="px-4 py-3 text-right">CLOSING BALANCE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(reportData.outletsTotals).map(([oid, totals]) => {
+                        const outletObj = outlets.find(o => o.id === oid) || { name: oid };
+                        return (
+                          <tr key={oid} className="text-xs text-gray-700 md:text-sm">
+                            <td className="px-4 py-3">{outletObj.name}</td>
+                            <td className="px-4 py-3 text-right">{Math.round(totals.salesQty || 0)}</td>
+                            <td className="px-4 py-3 text-right">₹{(totals.totalAmount || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right">₹{(totals.digitalPay || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right">₹{(totals.cashPay || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right">₹{(totals.totalRecv || 0).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right">{Math.round(totals.damages || 0)}</td>
+                            <td className={`px-4 py-3 text-right font-semibold ${totals.difference < 0 ? 'text-red-600' : totals.difference > 0 ? 'text-green-600' : 'text-gray-700'}`}>
+                              {totals.difference > 0 ? '+ ' : totals.difference < 0 ? '- ' : ''}₹{Math.abs(totals.difference || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             <div className="overflow-hidden rounded-2xl bg-eggWhite shadow-sm mb-6">
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">

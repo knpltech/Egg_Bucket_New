@@ -98,7 +98,6 @@ export const getReports = async (req, res) => {
 
     console.log('📊 Fetching reports for outlet:', outletId);
 
-
     // Fetch all collections in parallel, including dailyDamages
     const [salesSnapshot, digitalPaymentsSnapshot, cashPaymentsSnapshot, neccRateSnapshot, dailyDamagesSnapshot] = await Promise.all([
       db.collection('dailySales').limit(100).get(),
@@ -111,30 +110,130 @@ export const getReports = async (req, res) => {
     const fetchTime = Date.now() - startTime;
     console.log(`⚡ Fetched in ${fetchTime}ms`);
 
-    // Process data - extract values for the specific outlet
+
+    // Process data - extract values for the specific outlet (default path)
     const dateMap = {};
 
+    // If outletId === 'ALL' we will return aggregated totals per outlet instead
+    if (outletId === 'ALL') {
+      // Build a map of NECC rates per date to use when calculating amounts
+      const neccRateMap = {};
+      neccRateSnapshot.forEach(doc => {
+        const data = doc.data();
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        let entryDate = data.date;
+        if (typeof entryDate === 'string') {
+          const parts = entryDate.split('-');
+          if (parts.length === 3 && parts[0].length === 2) {
+            entryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          } else {
+            entryDate = new Date(entryDate);
+          }
+        } else if (entryDate && entryDate.toDate) {
+          entryDate = entryDate.toDate();
+        } else {
+          entryDate = new Date(entryDate);
+        }
+        if (!isNaN(entryDate.getTime())) {
+          const key = `${months[entryDate.getMonth()]} ${String(entryDate.getDate()).padStart(2,'0')}, ${entryDate.getFullYear()}`;
+          let rateValue = data.rate;
+          if (typeof rateValue === 'string') {
+            const match = rateValue.match(/([0-9]+(\.[0-9]+)?)/);
+            rateValue = match ? parseFloat(match[1]) : 0;
+          }
+          neccRateMap[key] = typeof rateValue === 'number' ? rateValue : 0;
+        }
+      });
+
+      const outletsTotals = {}; // { outletId: { salesQty, totalAmount, digitalPay, cashPay, totalRecv, difference, damages } }
+
+      // Helper to ensure outlet totals object exists
+      const ensureOutlet = (id) => {
+        if (!outletsTotals[id]) {
+          outletsTotals[id] = { salesQty: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0, damages: 0 };
+        }
+      };
+
+      // Aggregate sales (quantities) and compute amount using neccRateMap
+      salesSnapshot.forEach(doc => {
+        const data = doc.data();
+        const dateKey = formatDate(data.date || data.createdAt);
+        if (data.outlets && typeof data.outlets === 'object') {
+          Object.keys(data.outlets).forEach(oid => {
+            const qty = parseFloat(data.outlets[oid] || 0);
+            ensureOutlet(oid);
+            outletsTotals[oid].salesQty += qty;
+            const rate = neccRateMap[dateKey] || 0;
+            outletsTotals[oid].totalAmount += parseFloat((qty * rate).toFixed(2));
+          });
+        }
+      });
+
+      // Aggregate digital payments
+      digitalPaymentsSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.outlets && typeof data.outlets === 'object') {
+          Object.keys(data.outlets).forEach(oid => {
+            const amt = parseFloat(data.outlets[oid] || 0);
+            ensureOutlet(oid);
+            outletsTotals[oid].digitalPay += amt;
+            outletsTotals[oid].totalRecv += amt;
+          });
+        }
+      });
+
+      // Aggregate cash payments
+      cashPaymentsSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.outlets && typeof data.outlets === 'object') {
+          Object.keys(data.outlets).forEach(oid => {
+            const amt = parseFloat(data.outlets[oid] || 0);
+            ensureOutlet(oid);
+            outletsTotals[oid].cashPay += amt;
+            outletsTotals[oid].totalRecv += amt;
+          });
+        }
+      });
+
+      // Aggregate damages
+      dailyDamagesSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.damages && typeof data.damages === 'object') {
+          Object.keys(data.damages).forEach(oid => {
+            const dmg = parseFloat(data.damages[oid] || 0);
+            ensureOutlet(oid);
+            outletsTotals[oid].damages += dmg;
+          });
+        }
+      });
+
+      // Calculate difference (totalRecv - totalAmount) per outlet
+      Object.keys(outletsTotals).forEach(oid => {
+        const o = outletsTotals[oid];
+        o.difference = parseFloat((o.totalRecv - o.totalAmount).toFixed(2));
+      });
+
+      // Return per-outlet aggregated totals
+      return res.status(200).json({
+        success: true,
+        outletId: 'ALL',
+        outletsTotals,
+        _performance: {
+          fetchTimeMs: Date.now() - startTime,
+          recordsProcessed: salesSnapshot.size + digitalPaymentsSnapshot.size + cashPaymentsSnapshot.size + neccRateSnapshot.size + dailyDamagesSnapshot.size
+        }
+      });
+    }
+
+    // If not aggregating ALL outlets, populate dateMap for the requested outlet
     // Process sales data
     salesSnapshot.forEach(doc => {
       const data = doc.data();
       const dateKey = formatDate(data.date || data.createdAt);
-      
-      // Check if this document has data for our outlet
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = { date: dateKey, salesQty: 0, neccRate: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0 };
+      }
       if (data.outlets && data.outlets[outletId] !== undefined) {
-        if (!dateMap[dateKey]) {
-          dateMap[dateKey] = { 
-            date: dateKey, 
-            salesQty: 0, 
-            neccRate: 0, 
-            totalAmount: 0, 
-            digitalPay: 0, 
-            cashPay: 0, 
-            totalRecv: 0, 
-            difference: 0 
-          };
-        }
-        
-        // The value in outlets[outletName] is the quantity/amount
         dateMap[dateKey].salesQty += parseFloat(data.outlets[outletId] || 0);
       }
     });
@@ -143,20 +242,10 @@ export const getReports = async (req, res) => {
     digitalPaymentsSnapshot.forEach(doc => {
       const data = doc.data();
       const dateKey = formatDate(data.date || data.createdAt);
-      
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = { date: dateKey, salesQty: 0, neccRate: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0 };
+      }
       if (data.outlets && data.outlets[outletId] !== undefined) {
-        if (!dateMap[dateKey]) {
-          dateMap[dateKey] = { 
-            date: dateKey, 
-            salesQty: 0, 
-            neccRate: 0, 
-            totalAmount: 0, 
-            digitalPay: 0, 
-            cashPay: 0, 
-            totalRecv: 0, 
-            difference: 0 
-          };
-        }
         dateMap[dateKey].digitalPay += parseFloat(data.outlets[outletId] || 0);
       }
     });
@@ -165,39 +254,22 @@ export const getReports = async (req, res) => {
     cashPaymentsSnapshot.forEach(doc => {
       const data = doc.data();
       const dateKey = formatDate(data.date || data.createdAt);
-      
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = { date: dateKey, salesQty: 0, neccRate: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0 };
+      }
       if (data.outlets && data.outlets[outletId] !== undefined) {
-        if (!dateMap[dateKey]) {
-          dateMap[dateKey] = { 
-            date: dateKey, 
-            salesQty: 0, 
-            neccRate: 0, 
-            totalAmount: 0, 
-            digitalPay: 0, 
-            cashPay: 0, 
-            totalRecv: 0, 
-            difference: 0 
-          };
-        }
         dateMap[dateKey].cashPay += parseFloat(data.outlets[outletId] || 0);
       }
     });
 
-    // Process NECC rate - might be stored differently
+    // Process NECC rate - assign rate where available
     neccRateSnapshot.forEach(doc => {
       const data = doc.data();
-      // Normalize NECC rate entry date to report dateKey format
       let entryDate = data.date;
       if (typeof entryDate === 'string') {
-        // Try to parse DD-MM-YYYY or YYYY-MM-DD
         const parts = entryDate.split('-');
-        if (parts.length === 3) {
-          // If DD-MM-YYYY
-          if (parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
-            entryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-          } else {
-            entryDate = new Date(entryDate);
-          }
+        if (parts.length === 3 && parts[0].length === 2) {
+          entryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
         } else {
           entryDate = new Date(entryDate);
         }
@@ -206,39 +278,31 @@ export const getReports = async (req, res) => {
       } else {
         entryDate = new Date(entryDate);
       }
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const normalizedDateKey = `${months[entryDate.getMonth()]} ${String(entryDate.getDate()).padStart(2, '0')}, ${entryDate.getFullYear()}`;
-      // Always use the 'rate' field from neccrate collection for the date
-      if (dateMap[normalizedDateKey] && data.rate !== undefined) {
-        let rateValue = data.rate;
-        if (typeof rateValue === 'string') {
-          // Extract first number (integer or decimal) from string
-          const match = rateValue.match(/([0-9]+(\.[0-9]+)?)/);
-          rateValue = match ? parseFloat(match[1]) : 0;
+      if (!isNaN(entryDate.getTime())) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const normalizedDateKey = `${months[entryDate.getMonth()]} ${String(entryDate.getDate()).padStart(2,'0')}, ${entryDate.getFullYear()}`;
+        if (!dateMap[normalizedDateKey]) {
+          dateMap[normalizedDateKey] = { date: normalizedDateKey, salesQty: 0, neccRate: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0 };
         }
-        dateMap[normalizedDateKey].neccRate = typeof rateValue === 'number' ? rateValue : 0;
+        if (data.rate !== undefined) {
+          let rateValue = data.rate;
+          if (typeof rateValue === 'string') {
+            const match = rateValue.match(/([0-9]+(\.[0-9]+)?)/);
+            rateValue = match ? parseFloat(match[1]) : 0;
+          }
+          dateMap[normalizedDateKey].neccRate = typeof rateValue === 'number' ? rateValue : 0;
+        }
       }
     });
-
 
     // Add damages from dailyDamages collection
     dailyDamagesSnapshot.forEach(doc => {
       const data = doc.data();
       const dateKey = formatDate(data.date || data.createdAt);
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = { date: dateKey, salesQty: 0, neccRate: 0, totalAmount: 0, digitalPay: 0, cashPay: 0, totalRecv: 0, difference: 0, damages: 0 };
+      }
       if (data.damages && data.damages[outletId] !== undefined) {
-        if (!dateMap[dateKey]) {
-          dateMap[dateKey] = {
-            date: dateKey,
-            salesQty: 0,
-            neccRate: 0,
-            totalAmount: 0,
-            digitalPay: 0,
-            cashPay: 0,
-            totalRecv: 0,
-            difference: 0,
-            damages: 0
-          };
-        }
         dateMap[dateKey].damages = parseFloat(data.damages[outletId] || 0);
       }
     });

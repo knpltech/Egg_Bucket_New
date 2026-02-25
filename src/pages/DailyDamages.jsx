@@ -39,16 +39,19 @@ export default function DailyDamages() {
         const res = await fetch(`${API_URL}/daily-damage/all`);
         const data = await res.json();
         if (Array.isArray(data)) {
+          // normalize to rows with `outlets` map similar to other reports
           setDamages(
             data.map((d) => ({
               id: d.id,
               date: d.date,
-              ...(d.damages || {}),
+              outlets: d.damages || {},
               total: d.total || 0,
             }))
           );
         }
-      } catch {}
+      } catch (e) {
+        console.error("Failed fetching damages", e);
+      }
     };
     fetchDamages();
   }, [setDamages]);
@@ -135,10 +138,11 @@ export default function DailyDamages() {
                   <tr className="bg-orange-100 text-sm">
                     <th className="p-3 text-left">Date</th>
                     {outlets.map((o) => {
-                      const area = typeof o === "string" ? o : o.area;
+                      const key = o.id || o.name || o.area || o;
+                      const label = o.name || o.area || o.id || o;
                       return (
-                        <th key={area} className="p-3 text-center">
-                          {area}
+                        <th key={key} className="p-3 text-center">
+                          {label}
                         </th>
                       );
                     })}
@@ -148,20 +152,17 @@ export default function DailyDamages() {
                 <tbody>
                   {filteredData.map((d, i) => (
                     <tr key={i} className="border-t text-sm">
-                      <td className="p-3">
-                        {formatDateDisplay(d.date)}
-                      </td>
+                      <td className="p-3">{formatDateDisplay(d.date)}</td>
                       {outlets.map((o) => {
-                        const area =
-                          typeof o === "string" ? o : o.area;
+                        const key = o.id || o.name || o.area || o;
                         return (
-                          <td key={area} className="p-3 text-center">
-                            {d[area] ?? 0}
+                          <td key={key} className="p-3 text-center">
+                            {Number(d.outlets?.[key] || 0)}
                           </td>
                         );
                       })}
                       <td className="p-3 text-center font-bold text-orange-600">
-                        {d.total}
+                        {Number(d.total || 0)}
                       </td>
                     </tr>
                   ))}
@@ -170,14 +171,13 @@ export default function DailyDamages() {
                   <tr className="bg-orange-50 font-semibold text-orange-700">
                     <td className="p-3">Grand Total</td>
                     {outlets.map((o) => {
-                      const area =
-                        typeof o === "string" ? o : o.area;
+                      const key = o.id || o.name || o.area || o;
                       const total = filteredData.reduce(
-                        (sum, d) => sum + Number(d[area] || 0),
+                        (sum, d) => sum + Number(d.outlets?.[key] || 0),
                         0
                       );
                       return (
-                        <td key={area} className="p-3 text-center">
+                        <td key={key} className="p-3 text-center">
                           {total}
                         </td>
                       );

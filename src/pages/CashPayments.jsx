@@ -177,8 +177,9 @@ export default function CashPayments() {
     const data = filteredRows.map((row) => {
       const obj = { Date: row.date };
       outlets.forEach((o) => {
-        const area = o.area || o;
-        obj[area] = row.outlets?.[area] ?? 0;
+        const key = o.id || o.name || o.area || o;
+        const label = o.name || o.area || o.id || o;
+        obj[label] = row.outlets?.[key] ?? 0;
       });
       obj.Total = row.totalAmount;
       return obj;
@@ -288,23 +289,22 @@ export default function CashPayments() {
                 </h2>
 
                 {outlets.map((o) => {
-                  const area = o.area || o;
+                  const key = o.id || o.name || o.area || o;
+                  const label = o.name || o.area || o.id || o;
                   return (
-                    <div key={area} className="mb-3">
+                    <div key={key} className="mb-3">
                       <label className="text-xs">
-                        {area}
+                        {label}
                       </label>
                       <input
                         type="number"
                         min="0"
                         step="1"
-                        value={editValues[area] ?? 0}
+                        value={editValues[key] ?? 0}
                         onChange={(e) =>
                           setEditValues((prev) => ({
                             ...prev,
-                            [area]: Number(
-                              e.target.value
-                            ),
+                            [key]: Number(e.target.value),
                           }))
                         }
                         className="w-full border rounded px-3 py-2 text-sm"

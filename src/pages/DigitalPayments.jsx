@@ -102,10 +102,9 @@ export default function DigitalPayments() {
   const columnTotals = useMemo(() => {
     const totals = {};
     outlets.forEach((o) => {
-      const area = o.area || o;
-      totals[area] = filteredRows.reduce(
-        (sum, r) =>
-          sum + (r.outlets?.[area] ? Number(r.outlets[area]) : 0),
+      const key = o.id || o.name || o.area || o;
+      totals[key] = filteredRows.reduce(
+        (sum, r) => sum + (r.outlets?.[key] ? Number(r.outlets[key]) : 0),
         0
       );
     });
@@ -138,8 +137,8 @@ export default function DigitalPayments() {
 
     const updatedOutlets = {};
     outlets.forEach((o) => {
-      const area = o.area || o;
-      updatedOutlets[area] = Number(editValues[area]) || 0;
+      const key = o.id || o.name || o.area || o;
+      updatedOutlets[key] = Number(editValues[key]) || 0;
     });
 
     setIsEditSaving(true);
@@ -180,11 +179,12 @@ export default function DigitalPayments() {
   const downloadExcel = () => {
     if (!filteredRows.length) return alert("No data");
 
-    const data = filteredRows.map((row) => {
+      const data = filteredRows.map((row) => {
       const obj = { Date: row.date };
       outlets.forEach((o) => {
-        const area = o.area || o;
-        obj[area] = row.outlets?.[area] ?? 0;
+        const key = o.id || o.name || o.area || o;
+        const label = o.name || o.area || o.id || o;
+        obj[label] = row.outlets?.[key] ?? 0;
       });
       obj.Total = row.totalAmount;
       return obj;
@@ -242,13 +242,13 @@ export default function DigitalPayments() {
                     Date
                   </th>
                   {outlets.map((o) => {
-                    const area = o.area || o;
-                    return (
-                      <th key={area} className="px-4 py-3">
-                        {area.toUpperCase()}
-                      </th>
-                    );
-                  })}
+                      const label = o.name || o.area || o.id || o;
+                      return (
+                        <th key={label} className="px-4 py-3">
+                          {label.toUpperCase()}
+                        </th>
+                      );
+                    })}
                   <th className="px-4 py-3 text-right">
                     TOTAL
                   </th>
@@ -266,11 +266,11 @@ export default function DigitalPayments() {
                       {formatDisplayDate(row.date)}
                     </td>
                     {outlets.map((o) => {
-                      const area = o.area || o;
+                      const key = o.id || o.name || o.area || o;
                       return (
-                        <td key={area} className="px-4 py-3">
+                        <td key={key} className="px-4 py-3">
                           {formatCurrencyTwoDecimals(
-                            row.outlets?.[area]
+                            row.outlets?.[key]
                           )}
                         </td>
                       );
@@ -307,19 +307,20 @@ export default function DigitalPayments() {
                 </h2>
 
                 {outlets.map((o) => {
-                  const area = o.area || o;
+                  const key = o.id || o.name || o.area || o;
+                  const label = o.name || o.area || o.id || o;
                   return (
-                    <div key={area} className="mb-3">
+                    <div key={key} className="mb-3">
                       <label className="text-xs">
-                        {area}
+                        {label}
                       </label>
                       <input
                         type="number"
-                        value={editValues[area] || ""}
+                        value={editValues[key] || ""}
                         onChange={(e) =>
                           setEditValues((prev) => ({
                             ...prev,
-                            [area]: e.target.value,
+                            [key]: e.target.value,
                           }))
                         }
                         className="w-full border rounded px-3 py-2 text-sm"

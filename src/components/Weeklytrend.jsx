@@ -154,7 +154,7 @@ const Weeklytrend = ({ rows = [] }) => {
 
 
   return (
-    <div className="bg-gradient-to-br from-white to-orange-50 shadow-md rounded-2xl px-6 py-5 h-[420px] flex flex-col">
+    <div className="m-10 bg-gradient-to-br from-white to-orange-50 shadow-md rounded-2xl px-6 py-5 h-[420px] flex flex-col">
       
       {/* HEADER */}
       <div className="flex items-center justify-between mb-3">

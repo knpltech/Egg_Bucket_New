@@ -174,7 +174,7 @@ const Dailysales = () => {
           onEdit={isAdmin ? handleEditClick : null}
         />
       )}
-
+      
       {isAdmin && <Weeklytrend rows={rows} />}
     </div>
   );

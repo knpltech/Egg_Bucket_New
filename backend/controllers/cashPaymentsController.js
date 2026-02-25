@@ -14,13 +14,39 @@ export const updateCashPayment = async (req, res) => {
 import { db } from "../config/firebase.js";
 
 // Add a new cash payment entry to Firestore
+// Merge into existing date doc and prevent overwriting outlet values
 export const addCashPayment = async (req, res) => {
   try {
     const { date, outlets } = req.body;
     if (!date || !outlets || typeof outlets !== 'object') {
       return res.status(400).json({ message: "Missing or invalid required fields" });
     }
-    // Calculate total
+
+    const snapshot = await db.collection("cashPayments").where("date", "==", date).limit(1).get();
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      const data = doc.data();
+      const existingOutlets = data.outlets || {};
+
+      for (const k of Object.keys(outlets)) {
+        if (existingOutlets[k] !== undefined) {
+          return res.status(409).json({ message: `Cash payment for outlet '${k}' already exists for ${date}` });
+        }
+      }
+
+      const updatePayload = {};
+      let newTotal = Number(data.total || 0);
+      for (const [k, v] of Object.entries(outlets)) {
+        updatePayload[`outlets.${k}`] = Number(v);
+        newTotal += Number(v) || 0;
+      }
+      updatePayload.total = newTotal;
+
+      await db.collection("cashPayments").doc(doc.id).update(updatePayload);
+      const updated = await db.collection("cashPayments").doc(doc.id).get();
+      return res.status(200).json({ id: doc.id, ...updated.data(), message: 'Cash payment merged' });
+    }
+
     const total = Object.values(outlets).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
     const docRef = await db.collection("cashPayments").add({
       date,
