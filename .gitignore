@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 backend/config/serviceAccountKey.json
 src/assets/BrokenEgg.jsx
+.env
