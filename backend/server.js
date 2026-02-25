@@ -39,20 +39,17 @@ app.use("/api/digital-payments", digitalPaymentsRoutes);
 app.use("/api/outlets", outletRoutes);
 app.use("/api/reports", reportsRoutes); // ← ADD THIS LINE
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`Backend running at http://localhost:${PORT}`)
-);
 
-// Serve frontend static files
+
+// Serve frontend static files (ONLY if built)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendPath = path.join(__dirname, "../dist");
 
-// Serve frontend ONLY if dist exists
 if (fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath));
 
+  // SPA fallback
   app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(frontendPath, "index.html"));
   });
@@ -62,7 +59,7 @@ if (fs.existsSync(frontendPath)) {
   console.log("⚠️ Frontend dist folder not found, serving API only");
 }
 
-// Fallback: serve index.html for any non-API route (SPA support)
-app.get(/^(?!\/api).*/, (req, res) => {
-  res.sendFile(path.join(frontendPath, "index.html"));
-});
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () =>
+  console.log(`Backend running at http://localhost:${PORT}`)
+);
