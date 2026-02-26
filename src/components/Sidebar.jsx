@@ -99,6 +99,12 @@ export default function Sidebar() {
               {open && "Dashboard"}
             </Link>
 
+            {/* ✅ NEW DATA ENTRY OPTION */}
+            <Link to="/admin/data-entry" className={linkClass("/admin/data-entry")}>
+              <FontAwesomeIcon icon={faPenToSquare} />
+              {open && "Data Entry"}
+            </Link>
+
             <Link to="/admin/damages" className={linkClass("/admin/damages")}>
               <FontAwesomeIcon icon={faExclamationTriangle} />
               {open && "Daily Damages"}
@@ -122,12 +128,6 @@ export default function Sidebar() {
             <Link to="/admin/cash-payments" className={linkClass("/admin/cash-payments")}>
               <FontAwesomeIcon icon={faMoneyBillWave} />
               {open && "Cash Payments"}
-            </Link>
-
-            {/* ✅ NEW DATA ENTRY OPTION */}
-            <Link to="/admin/data-entry" className={linkClass("/admin/data-entry")}>
-              <FontAwesomeIcon icon={faPenToSquare} />
-              {open && "Data Entry"}
             </Link>
 
             <Link to="/admin/distribution" className={linkClass("/admin/distribution")}>
