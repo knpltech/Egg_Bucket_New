@@ -88,8 +88,13 @@ export default function DigitalPayments() {
     const sorted = [...rows].sort(
       (a, b) => new Date(a.date) - new Date(b.date)
     );
-
-    return sorted.filter((row) => {
+    // Calculate totalAmount for each row
+    const withTotals = sorted.map((row) => {
+      const outletsObj = row.outlets || {};
+      const total = Object.values(outletsObj).reduce((sum, v) => sum + (Number(v) || 0), 0);
+      return { ...row, totalAmount: total };
+    });
+    return withTotals.filter((row) => {
       if (filterFrom && new Date(row.date) < new Date(filterFrom))
         return false;
       if (filterTo && new Date(row.date) > new Date(filterTo))
@@ -178,18 +183,17 @@ export default function DigitalPayments() {
   /* ================= DOWNLOAD ================= */
   const downloadExcel = () => {
     if (!filteredRows.length) return alert("No data");
-
-      const data = filteredRows.map((row) => {
+    const data = filteredRows.map((row) => {
       const obj = { Date: row.date };
       outlets.forEach((o) => {
         const key = o.id || o.name || o.area || o;
         const label = o.name || o.area || o.id || o;
         obj[label] = row.outlets?.[key] ?? 0;
       });
-      obj.Total = row.totalAmount;
+      // Always recalculate total
+      obj.Total = Object.values(row.outlets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
       return obj;
     });
-
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Digital Payments");
@@ -296,6 +300,28 @@ export default function DigitalPayments() {
                 ))}
               </tbody>
             </table>
+            {/* Outlet totals row */}
+            <div className="overflow-auto bg-white rounded-xl shadow">
+              <table className="min-w-full text-sm">
+                <tfoot>
+                  <tr className="bg-gray-100 font-bold">
+                    <td className="px-4 py-3">TOTAL</td>
+                    {outlets.map((o) => {
+                      const key = o.id || o.name || o.area || o;
+                      return (
+                        <td key={key} className="px-4 py-3">
+                          {formatCurrencyTwoDecimals(columnTotals[key])}
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-3 text-right">
+                      {formatCurrencyTwoDecimals(columnTotals.grandTotal)}
+                    </td>
+                    {isAdmin && <td className="px-4 py-3" />} 
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
 
           {/* Edit Modal */}

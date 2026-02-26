@@ -10,6 +10,8 @@ export default function CashPaymentEntry() {
   const [outlets, setOutlets] = useState([]);
   const [values, setValues] = useState({});
   const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState([]);
+  const [entriesLoading, setEntriesLoading] = useState(false);
 
   // Load outlets
   useEffect(() => {
@@ -35,6 +37,23 @@ export default function CashPaymentEntry() {
     };
 
     loadOutlets();
+  }, []);
+
+  // Fetch cash payment entries
+  useEffect(() => {
+    const fetchEntries = async () => {
+      setEntriesLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/cash-payments/all`);
+        const data = await res.json();
+        setEntries(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setEntries([]);
+      } finally {
+        setEntriesLoading(false);
+      }
+    };
+    fetchEntries();
   }, []);
 
   const handleChange = (area, value) => {
@@ -160,6 +179,49 @@ export default function CashPaymentEntry() {
           </div>
 
         </form>
+      </div>
+      {/* Display cash payment entries */}
+      <div className="max-w-4xl mx-auto mt-8 bg-white rounded-2xl shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-800">Cash Payment Entries</h2>
+        {entriesLoading ? (
+          <div>Loading entries...</div>
+        ) : entries.length === 0 ? (
+          <div>No entries found.</div>
+        ) : (
+          <div className="overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2">Date</th>
+                  {outlets.map((o) => {
+                    const label = o.name || o.area || o.id || o;
+                    return (
+                      <th key={label} className="px-4 py-2">{label}</th>
+                    );
+                  })}
+                  <th className="px-4 py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => {
+                  const total = Object.values(entry.outlets || {}).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                  return (
+                    <tr key={entry.id || entry._id}>
+                      <td className="px-4 py-2">{entry.date}</td>
+                      {outlets.map((o) => {
+                        const key = o.id || o.name || o.area || o;
+                        return (
+                          <td key={key} className="px-4 py-2">{entry.outlets?.[key] ?? 0}</td>
+                        );
+                      })}
+                      <td className="px-4 py-2 text-right font-semibold">{total}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
